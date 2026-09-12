@@ -189,7 +189,8 @@ body {
 }
 
 .clock {
-    font-size: clamp(0.85rem, 1.5vw, 1.2rem);
-    color: var(--muted);
+    font-size: clamp(1.5rem, 3.2vw, 2.6rem);
+    font-weight: 700;
+    color: var(--fg);
     font-variant-numeric: tabular-nums;
 }

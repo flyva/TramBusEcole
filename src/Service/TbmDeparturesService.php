@@ -225,10 +225,22 @@ class TbmDeparturesService
         $labels = [];
         foreach ($data['records'] ?? [] as $record) {
             $fields = $record['fields'];
-            $labels[(int) $fields['bm_gid']] = $fields['bm_libelle'];
+            $labels[(int) $fields['bm_gid']] = $this->simplifyLigneLabel($fields['bm_libelle']);
         }
 
         return $labels;
+    }
+
+    /**
+     * TBM labels most bus lines "Principale N" or "Locale N" - simplify to "Liane N".
+     */
+    private function simplifyLigneLabel(string $label): string
+    {
+        if (preg_match('/^(Principale|Locale)\s+(\d+)$/i', $label, $matches)) {
+            return "Liane {$matches[2]}";
+        }
+
+        return $label;
     }
 
     /**

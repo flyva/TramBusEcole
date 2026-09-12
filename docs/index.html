@@ -72,7 +72,7 @@ body {
 .dots { display: flex; gap: 0.6em; }
 .dots .dot { width: 0.8vw; height: 0.8vw; min-width: 8px; min-height: 8px; border-radius: 50%; background: var(--border); }
 .dots .dot.active { background: var(--fg); }
-.clock { font-size: clamp(0.85rem, 1.5vw, 1.2rem); color: var(--muted); font-variant-numeric: tabular-nums; }
+.clock { font-size: clamp(1.5rem, 3.2vw, 2.6rem); font-weight: 700; color: var(--fg); font-variant-numeric: tabular-nums; }
 </style>
 </head>
 <body>
@@ -169,6 +169,11 @@ async function resolveCourses(coursIds) {
     return result;
 }
 
+function simplifyLigneLabel(label) {
+    const m = label.match(/^(Principale|Locale)\s+(\d+)$/i);
+    return m ? `Liane ${m[2]}` : label;
+}
+
 async function resolveLignes(ligneIds) {
     if (ligneIds.length === 0) {
         return {};
@@ -177,7 +182,7 @@ async function resolveLignes(ligneIds) {
     const data = await apiSearch({ dataset: 'sv_ligne_a', q: query, rows: ligneIds.length });
     const labels = {};
     for (const record of data.records || []) {
-        labels[record.fields.bm_gid] = record.fields.bm_libelle;
+        labels[record.fields.bm_gid] = simplifyLigneLabel(record.fields.bm_libelle);
     }
     return labels;
 }
