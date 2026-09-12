@@ -1,7 +1,7 @@
 import { Controller } from '@hotwired/stimulus';
 
 const DATA_REFRESH_MS = 20000;
-const SLIDE_DURATION_MS = 8000;
+const SLIDE_DURATION_MS = 5000;
 const CLOCK_TICK_MS = 1000;
 
 export default class extends Controller {
