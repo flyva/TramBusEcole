@@ -68,6 +68,27 @@ body {
 .slide-title.mode-tram .name { color: var(--tram); }
 .slide-title.mode-bus .name { color: var(--bus); }
 
+.alert {
+    display: flex;
+    align-items: center;
+    gap: 0.6em;
+    padding: 1vh 1.5vw;
+    border-radius: 0.8vw;
+    margin-bottom: 2vh;
+    font-size: clamp(0.9rem, 1.8vw, 1.3rem);
+    font-weight: 600;
+    flex-shrink: 0;
+    overflow: hidden;
+}
+.alert-text {
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+.alert--info { background: rgba(77, 163, 255, 0.12); color: #8fc4ff; border: 1px solid rgba(77, 163, 255, 0.35); }
+.alert--warning { background: rgba(255, 201, 60, 0.12); color: var(--urgent); border: 1px solid rgba(255, 201, 60, 0.4); }
+.alert--danger { background: rgba(255, 90, 90, 0.14); color: #ff8080; border: 1px solid rgba(255, 90, 90, 0.45); }
+
 .columns {
     flex: 1;
     display: grid;

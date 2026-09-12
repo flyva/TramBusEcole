@@ -36,6 +36,17 @@ class TbmDeparturesService
 
     private const MAX_PER_COLUMN = 3;
 
+    /**
+     * TBM line id per group, used to fetch traffic alerts independently of
+     * whichever passages happen to be found live.
+     */
+    private const LIGNE_ID_BY_GROUP = [
+        'tram' => 61, // Tram C
+        'bus-5' => 5,
+        'bus-23' => 21,
+        'bus-89' => 109,
+    ];
+
     public function __construct(private readonly HttpClientInterface $httpClient)
     {
     }
@@ -67,6 +78,8 @@ class TbmDeparturesService
         }
         $destNames = $this->resolveStopNames(array_keys($destGids));
 
+        $alertsByLigne = $this->fetchAlerts(array_values(self::LIGNE_ID_BY_GROUP));
+
         // Group stops by their pairing key, keeping STOPS order for stable left/right columns.
         $groups = [];
         foreach (self::STOPS as $stop) {
@@ -75,7 +88,7 @@ class TbmDeparturesService
         }
 
         $slides = [];
-        foreach ($groups as $group) {
+        foreach ($groups as $groupKey => $group) {
             $columns = [];
             $ligneLabel = null;
 
@@ -107,6 +120,7 @@ class TbmDeparturesService
                 'title' => $title,
                 'mode' => $group['mode'],
                 'columns' => $columns,
+                'alerts' => $alertsByLigne[self::LIGNE_ID_BY_GROUP[$groupKey]] ?? [],
             ];
         }
 
@@ -241,6 +255,45 @@ class TbmDeparturesService
         }
 
         return $label;
+    }
+
+    /**
+     * @param int[] $ligneIds
+     * @return array<int, array<int, array{titre: string, severite: string}>>
+     */
+    private function fetchAlerts(array $ligneIds): array
+    {
+        if ($ligneIds === []) {
+            return [];
+        }
+
+        $query = implode(' OR ', array_map(fn (int $id) => "rs_sv_ligne_a=$id", $ligneIds));
+
+        $response = $this->httpClient->request('GET', self::API_URL, [
+            'query' => [
+                'dataset' => 'sv_messa_a',
+                'q' => $query,
+                'rows' => 50,
+            ],
+        ]);
+
+        $data = $response->toArray(false);
+        $byLigne = [];
+
+        foreach ($data['records'] ?? [] as $record) {
+            $fields = $record['fields'];
+            $ligneId = $fields['rs_sv_ligne_a'] ?? null;
+            if ($ligneId === null) {
+                continue;
+            }
+
+            $byLigne[(int) $ligneId][] = [
+                'titre' => $fields['titre'] ?? ($fields['message'] ?? 'Info trafic'),
+                'severite' => $fields['severite'] ?? '1_FAIBLE',
+            ];
+        }
+
+        return $byLigne;
     }
 
     /**

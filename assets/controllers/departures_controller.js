@@ -77,8 +77,26 @@ export default class extends Controller {
                 <span class="icon">${icon}</span>
                 <span class="name">${slide.title}</span>
             </div>
+            ${this.renderAlerts(slide.alerts)}
             <div class="columns">${columnsHtml}</div>
         `;
+    }
+
+    severityRank(severite) {
+        const m = String(severite).match(/^(\d+)/);
+        return m ? parseInt(m[1], 10) : 1;
+    }
+
+    renderAlerts(alerts) {
+        if (!alerts || alerts.length === 0) {
+            return '';
+        }
+        const sorted = [...alerts].sort((a, b) => this.severityRank(b.severite) - this.severityRank(a.severite));
+        const topRank = this.severityRank(sorted[0].severite);
+        const level = topRank >= 3 ? 'danger' : topRank === 2 ? 'warning' : 'info';
+        const text = sorted.map((a) => a.titre).join('  •  ');
+
+        return `<div class="alert alert--${level}"><span class="alert-icon">⚠️</span><span class="alert-text">${text}</span></div>`;
     }
 
     renderColumn(column) {

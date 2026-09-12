@@ -33,6 +33,26 @@ body {
 .slide-title .name { font-size: clamp(1.6rem, 4vw, 3.2rem); font-weight: 800; letter-spacing: 0.02em; }
 .slide-title.mode-tram .name { color: var(--tram); }
 .slide-title.mode-bus .name { color: var(--bus); }
+.alert {
+    display: flex;
+    align-items: center;
+    gap: 0.6em;
+    padding: 1vh 1.5vw;
+    border-radius: 0.8vw;
+    margin-bottom: 2vh;
+    font-size: clamp(0.9rem, 1.8vw, 1.3rem);
+    font-weight: 600;
+    flex-shrink: 0;
+    overflow: hidden;
+}
+.alert-text {
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+.alert--info { background: rgba(77, 163, 255, 0.12); color: #8fc4ff; border: 1px solid rgba(77, 163, 255, 0.35); }
+.alert--warning { background: rgba(255, 201, 60, 0.12); color: var(--urgent); border: 1px solid rgba(255, 201, 60, 0.4); }
+.alert--danger { background: rgba(255, 90, 90, 0.14); color: #ff8080; border: 1px solid rgba(255, 90, 90, 0.45); }
 .columns { flex: 1; display: grid; grid-template-columns: 1fr 1fr; gap: 2.5vw; min-height: 0; }
 @media (max-aspect-ratio: 1/1) { .columns { grid-template-columns: 1fr; grid-template-rows: 1fr 1fr; } }
 .column {
@@ -108,6 +128,15 @@ const STOPS = [
     { gid: 2845, mode: 'BUS', group: 'bus-89' },
     { gid: 3060, mode: 'BUS', group: 'bus-89' },
 ];
+
+// Identifiant TBM de chaque ligne, pour aller chercher ses infos trafic
+// (perturbations, travaux, messages) indépendamment des passages en cours.
+const LIGNE_ID_BY_GROUP = {
+    tram: 61, // Tram C
+    'bus-5': 5,
+    'bus-23': 21,
+    'bus-89': 109,
+};
 
 async function apiSearch(params) {
     const url = new URL(API_URL);
@@ -187,6 +216,31 @@ async function resolveLignes(ligneIds) {
     return labels;
 }
 
+async function fetchAlerts(ligneIds) {
+    if (ligneIds.length === 0) {
+        return {};
+    }
+    const query = ligneIds.map((id) => `rs_sv_ligne_a=${id}`).join(' OR ');
+    const data = await apiSearch({ dataset: 'sv_messa_a', q: query, rows: 50 });
+
+    const byLigne = {};
+    for (const record of data.records || []) {
+        const f = record.fields;
+        const ligneId = f.rs_sv_ligne_a;
+        if (ligneId === undefined) {
+            continue;
+        }
+        if (!byLigne[ligneId]) {
+            byLigne[ligneId] = [];
+        }
+        byLigne[ligneId].push({
+            titre: f.titre || f.message || 'Info trafic',
+            severite: f.severite || '1_FAIBLE',
+        });
+    }
+    return byLigne;
+}
+
 async function resolveStopNames(gids) {
     if (gids.length === 0) {
         return {};
@@ -216,6 +270,8 @@ async function getDepartures() {
     Object.values(courseInfo).forEach((c) => { if (c.destGid !== null) destGids.add(c.destGid); });
     const destNames = await resolveStopNames([...destGids]);
 
+    const alertsByLigne = await fetchAlerts(Object.values(LIGNE_ID_BY_GROUP));
+
     const groups = {};
     for (const stop of STOPS) {
         if (!groups[stop.group]) {
@@ -225,7 +281,7 @@ async function getDepartures() {
     }
 
     const slides = [];
-    for (const group of Object.values(groups)) {
+    for (const [groupKey, group] of Object.entries(groups)) {
         let ligneLabel = null;
         const columns = [];
 
@@ -248,7 +304,8 @@ async function getDepartures() {
         const modeName = group.mode === 'TRAM' ? 'Tram' : 'Bus';
         const alreadyPrefixed = ligneLabel && ligneLabel.toLowerCase().startsWith(modeName.toLowerCase());
         const title = ligneLabel ? (alreadyPrefixed ? ligneLabel : `${modeName} ${ligneLabel}`) : modeName;
-        slides.push({ title, mode: group.mode, columns });
+        const alerts = alertsByLigne[LIGNE_ID_BY_GROUP[groupKey]] || [];
+        slides.push({ title, mode: group.mode, columns, alerts });
     }
 
     return slides;
@@ -286,6 +343,23 @@ function renderColumn(column) {
     return `<div class="column">${column.passages.map((p, i) => renderDeparture(p, i + 1)).join('')}</div>`;
 }
 
+function severityRank(severite) {
+    const m = String(severite).match(/^(\d+)/);
+    return m ? parseInt(m[1], 10) : 1;
+}
+
+function renderAlerts(alerts) {
+    if (!alerts || alerts.length === 0) {
+        return '';
+    }
+    const sorted = [...alerts].sort((a, b) => severityRank(b.severite) - severityRank(a.severite));
+    const topRank = severityRank(sorted[0].severite);
+    const level = topRank >= 3 ? 'danger' : topRank === 2 ? 'warning' : 'info';
+    const text = sorted.map((a) => a.titre).join('  •  ');
+
+    return `<div class="alert alert--${level}"><span class="alert-icon">⚠️</span><span class="alert-text">${text}</span></div>`;
+}
+
 function renderSlide() {
     const slide = slides[currentIndex];
     if (!slide) {
@@ -298,6 +372,7 @@ function renderSlide() {
             <span class="icon">${icon}</span>
             <span class="name">${slide.title}</span>
         </div>
+        ${renderAlerts(slide.alerts)}
         <div class="columns">${slide.columns.map(renderColumn).join('')}</div>
     `;
 }
