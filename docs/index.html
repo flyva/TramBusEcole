@@ -1,0 +1,330 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Lycée Václav Havel - Prochains passages</title>
+<style>
+:root {
+    color-scheme: dark;
+    --bg: #000;
+    --fg: #fff;
+    --muted: #9a9a9a;
+    --bus: #2ecc71;
+    --tram: #4da3ff;
+    --urgent: #ffc93c;
+    --border: #262626;
+    --panel-bg: #0c0c0c;
+}
+* { box-sizing: border-box; }
+html, body { height: 100%; }
+body {
+    margin: 0;
+    background: var(--bg);
+    color: var(--fg);
+    font-family: system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
+    overflow: hidden;
+}
+.board { height: 100vh; width: 100vw; display: flex; flex-direction: column; padding: 2.5vh 2.5vw; }
+.slide { flex: 1; display: flex; flex-direction: column; min-height: 0; animation: fade-in 0.6s ease; }
+@keyframes fade-in { from { opacity: 0; } to { opacity: 1; } }
+.slide-title { display: flex; align-items: baseline; gap: 1vw; margin-bottom: 2vh; flex-shrink: 0; }
+.slide-title .icon { font-size: clamp(2rem, 5vw, 4rem); }
+.slide-title .name { font-size: clamp(1.6rem, 4vw, 3.2rem); font-weight: 800; letter-spacing: 0.02em; }
+.slide-title.mode-tram .name { color: var(--tram); }
+.slide-title.mode-bus .name { color: var(--bus); }
+.columns { flex: 1; display: grid; grid-template-columns: 1fr 1fr; gap: 2.5vw; min-height: 0; }
+@media (max-aspect-ratio: 1/1) { .columns { grid-template-columns: 1fr; grid-template-rows: 1fr 1fr; } }
+.column {
+    background: var(--panel-bg);
+    border: 1px solid var(--border);
+    border-radius: 1.2vw;
+    padding: 2.5vh 2.5vw;
+    display: flex;
+    flex-direction: column;
+    justify-content: center;
+    gap: 2vh;
+    min-height: 0;
+    overflow: hidden;
+}
+.departure { border-top: 1px solid var(--border); padding-top: 1.5vh; }
+.departure:first-child { border-top: none; padding-top: 0; }
+.destination { color: var(--muted); overflow-wrap: break-word; }
+.rank-3 .destination { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.departure-time { color: var(--muted); }
+.departure--imminent .departure-wait { color: var(--urgent); }
+.rank-1 .destination { font-size: clamp(1.4rem, 3vw, 2.4rem); margin-bottom: 0.2em; }
+.rank-1 .departure-wait { font-size: clamp(3.2rem, 9vw, 7rem); font-weight: 900; line-height: 1; }
+.rank-1 .departure-wait .unit { font-size: 0.4em; font-weight: 700; color: var(--muted); margin-left: 0.2em; }
+.rank-1 .departure-time { font-size: clamp(1rem, 2vw, 1.5rem); margin-top: 0.2em; }
+.rank-2 .destination { font-size: clamp(1.1rem, 2.2vw, 1.7rem); margin-bottom: 0.1em; }
+.rank-2 .departure-wait { font-size: clamp(1.6rem, 4vw, 3rem); font-weight: 800; }
+.rank-2 .departure-wait .unit { font-size: 0.5em; font-weight: 700; color: var(--muted); margin-left: 0.2em; }
+.rank-2 .departure-time { font-size: clamp(0.85rem, 1.6vw, 1.1rem); }
+.departure.rank-3 { display: flex; align-items: baseline; justify-content: space-between; gap: 1em; }
+.rank-3 .destination { font-size: clamp(0.85rem, 1.6vw, 1.2rem); margin-bottom: 0; }
+.rank-3 .departure-wait { font-size: clamp(0.95rem, 1.9vw, 1.4rem); font-weight: 700; }
+.rank-3 .departure-wait .unit { font-size: 0.7em; color: var(--muted); margin-left: 0.2em; }
+.rank-3 .departure-time { display: none; }
+.empty { margin: auto; color: var(--muted); font-style: italic; font-size: clamp(1.1rem, 2.4vw, 1.8rem); }
+.loading { margin: auto; color: var(--muted); }
+.board-footer { flex-shrink: 0; display: flex; justify-content: space-between; align-items: center; margin-top: 1.5vh; }
+.dots { display: flex; gap: 0.6em; }
+.dots .dot { width: 0.8vw; height: 0.8vw; min-width: 8px; min-height: 8px; border-radius: 50%; background: var(--border); }
+.dots .dot.active { background: var(--fg); }
+.clock { font-size: clamp(0.85rem, 1.5vw, 1.2rem); color: var(--muted); font-variant-numeric: tabular-nums; }
+</style>
+</head>
+<body>
+    <div class="board">
+        <div class="slide" id="slide"><p class="loading">Chargement…</p></div>
+        <div class="board-footer">
+            <span class="dots" id="dots"></span>
+            <span class="clock" id="clock"></span>
+        </div>
+    </div>
+
+<script>
+/*
+ * Prochains passages bus/tram TBM (Bordeaux Métropole) pour l'arrêt
+ * "Lycée Václav Havel". Tout tourne côté navigateur : l'API open data de
+ * Bordeaux Métropole autorise le CORS, donc pas besoin de serveur/backend -
+ * ce fichier HTML seul suffit (utilisable tel quel sur GitHub Pages).
+ */
+const API_URL = 'https://opendata.bordeaux-metropole.fr/api/records/1.0/search/';
+const DATA_REFRESH_MS = 20000;
+const SLIDE_DURATION_MS = 8000;
+const MAX_PER_COLUMN = 3;
+
+// Plateformes physiques de l'arrêt "Lycée Václav Havel" (Bègles), groupées
+// par ligne pour garder des colonnes gauche/droite stables.
+const STOPS = [
+    { gid: 4004, mode: 'TRAM', group: 'tram' },
+    { gid: 4005, mode: 'TRAM', group: 'tram' },
+    { gid: 2601, mode: 'BUS', group: 'bus-lianes5' },
+    { gid: 606, mode: 'BUS', group: 'bus-lianes5' },
+];
+
+async function apiSearch(params) {
+    const url = new URL(API_URL);
+    Object.entries(params).forEach(([key, value]) => url.searchParams.set(key, value));
+    const response = await fetch(url);
+    if (!response.ok) {
+        throw new Error(`HTTP ${response.status}`);
+    }
+    return response.json();
+}
+
+async function fetchUpcoming(stopGid, now) {
+    const data = await apiSearch({ dataset: 'sv_horai_a', q: `rs_sv_arret_p=${stopGid}`, rows: 100 });
+    const records = [];
+
+    for (const record of data.records || []) {
+        const f = record.fields;
+        const timeString = f.hor_real || f.hor_estime || f.hor_app || f.hor_theo || null;
+        if (!timeString || f.rs_sv_cours_a === undefined) {
+            continue;
+        }
+        const time = new Date(timeString);
+        if (time < new Date(now.getTime() - 60000)) {
+            continue;
+        }
+        records.push({ coursId: f.rs_sv_cours_a, time });
+    }
+
+    records.sort((a, b) => a.time - b.time);
+    return records.slice(0, MAX_PER_COLUMN);
+}
+
+async function resolveCourses(coursIds) {
+    if (coursIds.length === 0) {
+        return {};
+    }
+    const query = coursIds.map((id) => `bm_gid=${id}`).join(' OR ');
+    const data = await apiSearch({ dataset: 'sv_cours_a', q: query, rows: coursIds.length });
+
+    const ligneIds = new Set();
+    const courses = {};
+    for (const record of data.records || []) {
+        const f = record.fields;
+        const ligneId = f.bm_rs_sv_ligne_a ?? null;
+        courses[f.bm_gid] = { ligneId, destGid: f.bm_rg_sv_arret_p_nd ?? null };
+        if (ligneId !== null) {
+            ligneIds.add(ligneId);
+        }
+    }
+
+    const ligneLabels = await resolveLignes([...ligneIds]);
+    const result = {};
+    for (const [coursId, course] of Object.entries(courses)) {
+        result[coursId] = {
+            ligne: course.ligneId !== null ? (ligneLabels[course.ligneId] || null) : null,
+            destGid: course.destGid,
+        };
+    }
+    return result;
+}
+
+async function resolveLignes(ligneIds) {
+    if (ligneIds.length === 0) {
+        return {};
+    }
+    const query = ligneIds.map((id) => `bm_gid=${id}`).join(' OR ');
+    const data = await apiSearch({ dataset: 'sv_ligne_a', q: query, rows: ligneIds.length });
+    const labels = {};
+    for (const record of data.records || []) {
+        labels[record.fields.bm_gid] = record.fields.bm_libelle;
+    }
+    return labels;
+}
+
+async function resolveStopNames(gids) {
+    if (gids.length === 0) {
+        return {};
+    }
+    const query = gids.map((id) => `gid=${id}`).join(' OR ');
+    const data = await apiSearch({ dataset: 'sv_arret_p', q: query, rows: gids.length });
+    const names = {};
+    for (const record of data.records || []) {
+        names[record.fields.gid] = record.fields.libelle;
+    }
+    return names;
+}
+
+async function getDepartures() {
+    const now = new Date();
+
+    const rawByGid = {};
+    await Promise.all(STOPS.map(async (stop) => {
+        rawByGid[stop.gid] = await fetchUpcoming(stop.gid, now);
+    }));
+
+    const allCoursIds = new Set();
+    Object.values(rawByGid).forEach((records) => records.forEach((r) => allCoursIds.add(r.coursId)));
+    const courseInfo = await resolveCourses([...allCoursIds]);
+
+    const destGids = new Set();
+    Object.values(courseInfo).forEach((c) => { if (c.destGid !== null) destGids.add(c.destGid); });
+    const destNames = await resolveStopNames([...destGids]);
+
+    const groups = {};
+    for (const stop of STOPS) {
+        if (!groups[stop.group]) {
+            groups[stop.group] = { mode: stop.mode, gids: [] };
+        }
+        groups[stop.group].gids.push(stop.gid);
+    }
+
+    const slides = [];
+    for (const group of Object.values(groups)) {
+        let ligneLabel = null;
+        const columns = [];
+
+        for (const gid of group.gids) {
+            const passages = [];
+            for (const record of rawByGid[gid]) {
+                const course = courseInfo[record.coursId];
+                if (!ligneLabel && course && course.ligne) {
+                    ligneLabel = course.ligne;
+                }
+                passages.push({
+                    destination: course && course.destGid !== null ? (destNames[course.destGid] || null) : null,
+                    heure: record.time.toLocaleTimeString('fr-FR', { hour: '2-digit', minute: '2-digit' }),
+                    attenteMinutes: Math.max(0, Math.ceil((record.time - now) / 60000)),
+                });
+            }
+            columns.push({ gid, passages: passages.slice(0, MAX_PER_COLUMN) });
+        }
+
+        const modeName = group.mode === 'TRAM' ? 'Tram' : 'Bus';
+        const alreadyPrefixed = ligneLabel && ligneLabel.toLowerCase().startsWith(modeName.toLowerCase());
+        const title = ligneLabel ? (alreadyPrefixed ? ligneLabel : `${modeName} ${ligneLabel}`) : modeName;
+        slides.push({ title, mode: group.mode, columns });
+    }
+
+    return slides;
+}
+
+// --- Affichage ---
+
+let slides = [];
+let currentIndex = 0;
+
+function renderDots() {
+    document.getElementById('dots').innerHTML = slides
+        .map((_, i) => `<span class="dot${i === currentIndex ? ' active' : ''}"></span>`)
+        .join('');
+}
+
+function renderDeparture(departure, rank) {
+    const destination = departure.destination || '?';
+    const isImminent = departure.attenteMinutes <= 0;
+    const wait = isImminent ? 'Proche' : `${departure.attenteMinutes}<span class="unit">min</span>`;
+
+    return `
+        <div class="departure rank-${rank}${isImminent ? ' departure--imminent' : ''}">
+            <div class="destination">→ ${destination}</div>
+            <div class="departure-wait">${wait}</div>
+            <div class="departure-time">${departure.heure}</div>
+        </div>
+    `;
+}
+
+function renderColumn(column) {
+    if (column.passages.length === 0) {
+        return '<div class="column"><p class="empty">Aucun passage prévu</p></div>';
+    }
+    return `<div class="column">${column.passages.map((p, i) => renderDeparture(p, i + 1)).join('')}</div>`;
+}
+
+function renderSlide() {
+    const slide = slides[currentIndex];
+    if (!slide) {
+        document.getElementById('slide').innerHTML = '<p class="loading">Chargement…</p>';
+        return;
+    }
+    const icon = slide.mode === 'TRAM' ? '🚊' : '🚌';
+    document.getElementById('slide').innerHTML = `
+        <div class="slide-title mode-${slide.mode.toLowerCase()}">
+            <span class="icon">${icon}</span>
+            <span class="name">${slide.title}</span>
+        </div>
+        <div class="columns">${slide.columns.map(renderColumn).join('')}</div>
+    `;
+}
+
+function nextSlide() {
+    if (slides.length === 0) {
+        return;
+    }
+    currentIndex = (currentIndex + 1) % slides.length;
+    renderDots();
+    renderSlide();
+}
+
+async function refresh() {
+    try {
+        const data = await getDepartures();
+        slides = data;
+        if (currentIndex >= slides.length) {
+            currentIndex = 0;
+        }
+        renderDots();
+        renderSlide();
+    } catch (error) {
+        console.error(error);
+    }
+}
+
+function tickClock() {
+    document.getElementById('clock').textContent = new Date().toLocaleTimeString('fr-FR');
+}
+
+refresh();
+tickClock();
+setInterval(refresh, DATA_REFRESH_MS);
+setInterval(nextSlide, SLIDE_DURATION_MS);
+setInterval(tickClock, 1000);
+</script>
+</body>
+</html>

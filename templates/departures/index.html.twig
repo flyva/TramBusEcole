@@ -1,0 +1,16 @@
+{% extends 'base.html.twig' %}
+
+{% block title %}Lycée Václav Havel - Prochains passages{% endblock %}
+
+{% block body %}
+    <div class="board" data-controller="departures" data-departures-url-value="{{ path('api_departures') }}">
+        <div class="slide" data-departures-target="slide">
+            <p class="loading">Chargement…</p>
+        </div>
+
+        <div class="board-footer">
+            <span class="dots" data-departures-target="dots"></span>
+            <span class="clock" data-departures-target="clock"></span>
+        </div>
+    </div>
+{% endblock %}
