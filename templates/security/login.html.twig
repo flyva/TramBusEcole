@@ -1,0 +1,27 @@
+{% extends 'base.html.twig' %}
+
+{% block title %}Connexion admin{% endblock %}
+
+{% block body %}
+    <style>
+        body { background: #000; color: #fff; font-family: system-ui, sans-serif; display: flex; align-items: center; justify-content: center; height: 100vh; margin: 0; }
+        .login-box { background: #0c0c0c; border: 1px solid #262626; border-radius: 12px; padding: 32px; width: 100%; max-width: 320px; }
+        .login-box h1 { font-size: 1.3rem; margin: 0 0 20px; }
+        .login-box label { display: block; font-size: 0.85rem; color: #9a9a9a; margin-bottom: 4px; }
+        .login-box input[type="password"] { width: 100%; padding: 10px; border-radius: 6px; border: 1px solid #333; background: #1a1a1a; color: #fff; margin-bottom: 16px; box-sizing: border-box; }
+        .login-box button { width: 100%; padding: 10px; border-radius: 6px; border: none; background: #4da3ff; color: #000; font-weight: 700; cursor: pointer; }
+        .error { color: #ff8080; font-size: 0.85rem; margin-bottom: 12px; }
+    </style>
+    <div class="login-box">
+        <h1>🚏 Administration</h1>
+        {% if error %}
+            <p class="error">Mot de passe incorrect.</p>
+        {% endif %}
+        <form method="post">
+            <label for="password">Mot de passe</label>
+            <input type="hidden" name="_username" value="admin">
+            <input type="password" id="password" name="_password" required autofocus>
+            <button type="submit">Se connecter</button>
+        </form>
+    </div>
+{% endblock %}

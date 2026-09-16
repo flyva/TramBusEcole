@@ -2,6 +2,7 @@
 
 namespace App\Controller;
 
+use App\Repository\SlideRepository;
 use App\Service\TbmDeparturesService;
 use Symfony\Component\HttpFoundation\JsonResponse;
 use Symfony\Component\HttpFoundation\Response;
@@ -17,11 +18,21 @@ class DeparturesController extends AbstractController
     }
 
     #[Route('/api/departures', name: 'api_departures', methods: ['GET'])]
-    public function departures(TbmDeparturesService $tbm): JsonResponse
+    public function departures(TbmDeparturesService $tbm, SlideRepository $slideRepository): JsonResponse
     {
+        $slides = $tbm->getDepartures();
+
+        foreach ($slideRepository->findActiveOrdered() as $slide) {
+            $slides[] = [
+                'type' => 'image',
+                'imageUrl' => '/uploads/slides/'.$slide->getFilename(),
+                'caption' => $slide->getCaption(),
+            ];
+        }
+
         return $this->json([
             'generatedAt' => (new \DateTimeImmutable())->format(DATE_ATOM),
-            'slides' => $tbm->getDepartures(),
+            'slides' => $slides,
         ]);
     }
 }

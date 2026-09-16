@@ -117,6 +117,7 @@ class TbmDeparturesService
             $alreadyPrefixed = $ligneLabel !== null && str_starts_with(strtolower($ligneLabel), strtolower($modeName));
             $title = $ligneLabel !== null ? ($alreadyPrefixed ? $ligneLabel : "$modeName $ligneLabel") : $modeName;
             $slides[] = [
+                'type' => 'departures',
                 'title' => $title,
                 'mode' => $group['mode'],
                 'columns' => $columns,

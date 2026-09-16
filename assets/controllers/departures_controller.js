@@ -69,6 +69,11 @@ export default class extends Controller {
             return;
         }
 
+        if (slide.type === 'image') {
+            this.slideTarget.innerHTML = this.renderImageSlide(slide);
+            return;
+        }
+
         const icon = slide.mode === 'TRAM' ? '🚊' : '🚌';
         const columnsHtml = slide.columns.map((c) => this.renderColumn(c)).join('');
 
@@ -79,6 +84,17 @@ export default class extends Controller {
             </div>
             ${this.renderAlerts(slide.alerts)}
             <div class="columns">${columnsHtml}</div>
+        `;
+    }
+
+    renderImageSlide(slide) {
+        const caption = slide.caption ? `<div class="image-caption">${slide.caption}</div>` : '';
+
+        return `
+            <div class="image-slide">
+                <img src="${slide.imageUrl}" alt="${slide.caption || ''}">
+                ${caption}
+            </div>
         `;
     }
 
