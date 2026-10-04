@@ -112,17 +112,25 @@ class ItineraryBuilder
             ];
         }
 
-        // Prefer a line that actually serves the destination too (no transfer needed);
-        // then no serious alert; then the soonest departure.
+        // Tram by default - it's faster and more frequent - but fall back to bus
+        // when the tram option has a serious active disruption. Among same-priority
+        // candidates, prefer one that also serves the destination directly (no
+        // transfer needed), then the soonest departure.
         usort($candidates, function (array $a, array $b) {
-            if ($a['direct'] !== $b['direct']) {
-                return $a['direct'] ? -1 : 1;
-            }
-
             $aOk = $a['maxSeverity'] < self::SERIOUS_ALERT_SEVERITY;
             $bOk = $b['maxSeverity'] < self::SERIOUS_ALERT_SEVERITY;
             if ($aOk !== $bOk) {
                 return $aOk ? -1 : 1;
+            }
+
+            $aTram = $a['vehicule'] === 'TRAM';
+            $bTram = $b['vehicule'] === 'TRAM';
+            if ($aTram !== $bTram) {
+                return $aTram ? -1 : 1;
+            }
+
+            if ($a['direct'] !== $b['direct']) {
+                return $a['direct'] ? -1 : 1;
             }
 
             return $a['nextWaitMinutes'] <=> $b['nextWaitMinutes'];

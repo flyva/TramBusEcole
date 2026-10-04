@@ -121,6 +121,7 @@ export default class extends Controller {
         const nearbyHtml = (slide.nearby || []).length
             ? slide.nearby.map((n) => `
                 <div class="itinerary-nearby-item">
+                    <span class="icon">${n.vehicule === 'TRAM' ? '🚊' : '🚌'}</span>
                     ${n.ligne ? `<span class="ligne">${n.ligne}</span>` : ''}
                     <span class="destination">${n.stopLibelle}</span>
                     ${n.passages[0] ? `<span class="departure-wait">${n.passages[0].attenteMinutes}<span class="unit">min</span></span>` : ''}
@@ -133,7 +134,7 @@ export default class extends Controller {
                 <span class="icon">🧭</span>
                 <span class="name">${slide.presetName}</span>
             </div>
-            <div class="columns">
+            <div class="columns columns--itinerary">
                 <div class="column itinerary-left">
                     ${primaryHtml}
                     ${metaHtml}
@@ -141,8 +142,12 @@ export default class extends Controller {
                 <div class="column itinerary-right">
                     <div class="itinerary-qr">
                         <img src="${slide.qrCodeUrl}" alt="QR code itinéraire">
-                        <div class="itinerary-address">${slide.address}</div>
+                        <div class="itinerary-qr-info">
+                            <div class="itinerary-qr-label">Itinéraire complet</div>
+                            <div class="itinerary-address">${slide.address}</div>
+                        </div>
                     </div>
+                    <div class="itinerary-nearby-title">Autres lignes à proximité</div>
                     ${nearbyHtml}
                 </div>
             </div>
