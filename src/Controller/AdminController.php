@@ -2,10 +2,11 @@
 
 namespace App\Controller;
 
+use App\Entity\ScreenOffPeriod;
 use App\Entity\Slide;
-use App\Form\ScheduleType;
+use App\Form\ScreenOffPeriodType;
 use App\Form\SlideUploadType;
-use App\Repository\SettingRepository;
+use App\Repository\ScreenOffPeriodRepository;
 use App\Repository\SlideRepository;
 use Doctrine\ORM\EntityManagerInterface;
 use Symfony\Bundle\FrameworkBundle\Controller\AbstractController;
@@ -20,31 +21,51 @@ use Symfony\Component\String\Slugger\SluggerInterface;
 class AdminController extends AbstractController
 {
     #[Route('', name: 'admin_dashboard', methods: ['GET'])]
-    public function dashboard(SettingRepository $settingRepository, SlideRepository $slideRepository): Response
+    public function dashboard(ScreenOffPeriodRepository $screenOffPeriodRepository, SlideRepository $slideRepository): Response
     {
-        $scheduleForm = $this->createForm(ScheduleType::class, $settingRepository->getOrCreate());
+        $periodForm = $this->createForm(ScreenOffPeriodType::class, new ScreenOffPeriod());
         $slideForm = $this->createForm(SlideUploadType::class);
 
         return $this->render('admin/dashboard.html.twig', [
-            'scheduleForm' => $scheduleForm,
+            'periodForm' => $periodForm,
+            'periods' => $screenOffPeriodRepository->findAllOrdered(),
             'slideForm' => $slideForm,
             'slides' => $slideRepository->findAllOrdered(),
         ]);
     }
 
-    #[Route('/schedule', name: 'admin_schedule', methods: ['POST'])]
-    public function schedule(Request $request, SettingRepository $settingRepository, EntityManagerInterface $em): Response
+    #[Route('/screen-off', name: 'admin_screen_off_new', methods: ['POST'])]
+    public function addScreenOffPeriod(Request $request, EntityManagerInterface $em): Response
     {
-        $setting = $settingRepository->getOrCreate();
-        $form = $this->createForm(ScheduleType::class, $setting);
+        $period = new ScreenOffPeriod();
+        $form = $this->createForm(ScreenOffPeriodType::class, $period);
         $form->handleRequest($request);
 
         if ($form->isSubmitted() && $form->isValid()) {
+            $em->persist($period);
             $em->flush();
-            $this->addFlash('success', 'Horaires enregistrés.');
+            $this->addFlash('success', 'Plage ajoutée.');
         } else {
-            $this->addFlash('error', 'Horaires invalides.');
+            $this->addFlash('error', 'Plage invalide.');
         }
+
+        return $this->redirectToRoute('admin_dashboard');
+    }
+
+    #[Route('/screen-off/{id}/toggle', name: 'admin_screen_off_toggle', methods: ['POST'])]
+    public function toggleScreenOffPeriod(ScreenOffPeriod $period, EntityManagerInterface $em): Response
+    {
+        $period->setEnabled(!$period->isEnabled());
+        $em->flush();
+
+        return $this->redirectToRoute('admin_dashboard');
+    }
+
+    #[Route('/screen-off/{id}/delete', name: 'admin_screen_off_delete', methods: ['POST'])]
+    public function deleteScreenOffPeriod(ScreenOffPeriod $period, EntityManagerInterface $em): Response
+    {
+        $em->remove($period);
+        $em->flush();
 
         return $this->redirectToRoute('admin_dashboard');
     }

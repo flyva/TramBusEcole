@@ -52,23 +52,41 @@
 
         <div class="card">
             <h2>Extinction automatique de l'écran</h2>
-            {{ form_start(scheduleForm, {action: path('admin_schedule')}) }}
-                <div class="checkbox-row">
-                    {{ form_widget(scheduleForm.scheduleEnabled) }}
-                    {{ form_label(scheduleForm.scheduleEnabled) }}
+
+            {% if periods is empty %}
+                <p class="empty">Aucune plage d'extinction. L'écran reste toujours allumé.</p>
+            {% else %}
+                <div class="slide-list" style="margin-bottom: 16px;">
+                    {% for period in periods %}
+                        <div class="slide-row{{ period.enabled ? '' : ' inactive' }}">
+                            <div class="caption">
+                                Éteint de <strong>{{ period.startTime }}</strong> à <strong>{{ period.endTime }}</strong>
+                                <small>{{ period.enabled ? 'Active' : 'Désactivée' }}</small>
+                            </div>
+                            <form method="post" action="{{ path('admin_screen_off_toggle', {id: period.id}) }}">
+                                <button type="submit" class="btn-small">{{ period.enabled ? 'Désactiver' : 'Activer' }}</button>
+                            </form>
+                            <form method="post" action="{{ path('admin_screen_off_delete', {id: period.id}) }}" onsubmit="return confirm('Supprimer cette plage ?');">
+                                <button type="submit" class="btn-small danger">Supprimer</button>
+                            </form>
+                        </div>
+                    {% endfor %}
                 </div>
+            {% endif %}
+
+            {{ form_start(periodForm, {action: path('admin_screen_off_new')}) }}
                 <div class="times">
                     <div>
-                        {{ form_label(scheduleForm.screenOnTime) }}
-                        {{ form_widget(scheduleForm.screenOnTime) }}
+                        {{ form_label(periodForm.startTime) }}
+                        {{ form_widget(periodForm.startTime) }}
                     </div>
                     <div>
-                        {{ form_label(scheduleForm.screenOffTime) }}
-                        {{ form_widget(scheduleForm.screenOffTime) }}
+                        {{ form_label(periodForm.endTime) }}
+                        {{ form_widget(periodForm.endTime) }}
                     </div>
                 </div>
-                <button type="submit" class="primary">Enregistrer</button>
-            {{ form_end(scheduleForm) }}
+                <button type="submit" class="primary">+ Ajouter une plage</button>
+            {{ form_end(periodForm) }}
         </div>
 
         <div class="card">
