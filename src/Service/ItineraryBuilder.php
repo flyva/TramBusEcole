@@ -41,7 +41,23 @@ class ItineraryBuilder
         // near the destination, otherwise the "best line" ends up being whatever
         // happens to stop next to the destination, regardless of where you start from.
         $stops = $this->tbm->findStopsNear($originLat, $originLng, self::SEARCH_RADIUS_METERS);
+
+        // Bus stops are far more numerous than tram ones (often several platforms
+        // per direction at the same spot), so a flat "N nearest" cut can crowd out
+        // a tram stop that's still well within walking distance. Keep the nearest
+        // tram explicitly so it's never excluded just by volume of bus platforms.
+        $nearestTram = null;
+        foreach ($stops as $stop) {
+            if ($stop['vehicule'] === 'TRAM') {
+                $nearestTram = $stop;
+                break;
+            }
+        }
+
         $stops = array_slice($stops, 0, self::MAX_STOPS_CONSIDERED);
+        if ($nearestTram !== null && !in_array($nearestTram, $stops, true)) {
+            $stops[] = $nearestTram;
+        }
 
         $rawByGid = [];
         $allCoursIds = [];
@@ -164,7 +180,20 @@ class ItineraryBuilder
     private function findLigneIdsServing(float $lat, float $lng): array
     {
         $now = new \DateTimeImmutable('now', new \DateTimeZone('UTC'));
-        $stops = array_slice($this->tbm->findStopsNear($lat, $lng, self::SEARCH_RADIUS_METERS), 0, self::MAX_STOPS_CONSIDERED);
+        $allStops = $this->tbm->findStopsNear($lat, $lng, self::SEARCH_RADIUS_METERS);
+
+        $nearestTram = null;
+        foreach ($allStops as $stop) {
+            if ($stop['vehicule'] === 'TRAM') {
+                $nearestTram = $stop;
+                break;
+            }
+        }
+
+        $stops = array_slice($allStops, 0, self::MAX_STOPS_CONSIDERED);
+        if ($nearestTram !== null && !in_array($nearestTram, $stops, true)) {
+            $stops[] = $nearestTram;
+        }
 
         $coursIds = [];
         foreach ($stops as $stop) {
