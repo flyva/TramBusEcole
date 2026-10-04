@@ -59,6 +59,16 @@ class AdminController extends AbstractController
         return $this->redirectToRoute('admin_dashboard');
     }
 
+    #[Route('/jingle', name: 'admin_jingle', methods: ['POST'])]
+    public function jingle(SettingRepository $settingRepository, EntityManagerInterface $em): JsonResponse
+    {
+        $setting = $settingRepository->getOrCreate();
+        $setting->setJingleRequestedAt(new \DateTimeImmutable());
+        $em->flush();
+
+        return $this->json(['ok' => true]);
+    }
+
     #[Route('/screen-off', name: 'admin_screen_off_new', methods: ['POST'])]
     public function addScreenOffPeriod(Request $request, EntityManagerInterface $em): Response
     {

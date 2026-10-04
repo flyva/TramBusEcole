@@ -35,6 +35,10 @@ class Setting
     #[ORM\Column(nullable: true)]
     private ?\DateTimeImmutable $overrideUntil = null;
 
+    /** Bumped whenever the admin asks the board to play its test jingle. */
+    #[ORM\Column(nullable: true)]
+    private ?\DateTimeImmutable $jingleRequestedAt = null;
+
     public function getId(): ?int
     {
         return $this->id;
@@ -96,6 +100,18 @@ class Setting
     public function setOverrideUntil(?\DateTimeImmutable $overrideUntil): static
     {
         $this->overrideUntil = $overrideUntil;
+
+        return $this;
+    }
+
+    public function getJingleRequestedAt(): ?\DateTimeImmutable
+    {
+        return $this->jingleRequestedAt;
+    }
+
+    public function setJingleRequestedAt(?\DateTimeImmutable $jingleRequestedAt): static
+    {
+        $this->jingleRequestedAt = $jingleRequestedAt;
 
         return $this;
     }

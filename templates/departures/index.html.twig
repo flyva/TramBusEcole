@@ -3,7 +3,10 @@
 {% block title %}Lycée Václav Havel - Prochains passages{% endblock %}
 
 {% block body %}
-    <div class="board" data-controller="departures" data-departures-url-value="{{ path('api_departures') }}">
+    <div class="board"
+         data-controller="departures jingle"
+         data-departures-url-value="{{ path('api_departures') }}"
+         data-jingle-url-value="{{ path('api_jingle_check') }}">
         <div class="slide" data-departures-target="slide">
             <p class="loading">Chargement…</p>
         </div>
