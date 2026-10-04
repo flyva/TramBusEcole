@@ -51,7 +51,6 @@ class DeparturesController extends AbstractController
                 'screenOn' => false,
                 'activePreset' => null,
                 'slides' => [],
-                'jingleAt' => $setting->getJingleRequestedAt()?->format(DATE_ATOM),
             ]);
         }
 
@@ -88,20 +87,6 @@ class DeparturesController extends AbstractController
             'screenOn' => true,
             'activePreset' => $activePreset?->getName(),
             'slides' => $slides,
-            'jingleAt' => $setting->getJingleRequestedAt()?->format(DATE_ATOM),
-        ]);
-    }
-
-    /**
-     * Polled frequently and separately from the full departures payload so
-     * the admin's "test jingle" button gets picked up within a couple of
-     * seconds instead of waiting for the next 20s data refresh.
-     */
-    #[Route('/api/jingle-check', name: 'api_jingle_check', methods: ['GET'])]
-    public function jingleCheck(SettingRepository $settingRepository): JsonResponse
-    {
-        return $this->json([
-            'jingleAt' => $settingRepository->getOrCreate()->getJingleRequestedAt()?->format(DATE_ATOM),
         ]);
     }
 }
