@@ -4,14 +4,17 @@ namespace App\Controller;
 
 use App\Entity\ScreenOffPeriod;
 use App\Entity\Slide;
+use App\Form\OriginType;
 use App\Form\ScreenOffPeriodType;
 use App\Form\SlideUploadType;
 use App\Repository\ScreenOffPeriodRepository;
+use App\Repository\SettingRepository;
 use App\Repository\SlideRepository;
 use Doctrine\ORM\EntityManagerInterface;
 use Symfony\Bundle\FrameworkBundle\Controller\AbstractController;
 use Symfony\Component\HttpFoundation\File\Exception\FileException;
 use Symfony\Component\HttpFoundation\File\UploadedFile;
+use Symfony\Component\HttpFoundation\JsonResponse;
 use Symfony\Component\HttpFoundation\Request;
 use Symfony\Component\HttpFoundation\Response;
 use Symfony\Component\Routing\Attribute\Route;
@@ -21,17 +24,36 @@ use Symfony\Component\String\Slugger\SluggerInterface;
 class AdminController extends AbstractController
 {
     #[Route('', name: 'admin_dashboard', methods: ['GET'])]
-    public function dashboard(ScreenOffPeriodRepository $screenOffPeriodRepository, SlideRepository $slideRepository): Response
+    public function dashboard(ScreenOffPeriodRepository $screenOffPeriodRepository, SlideRepository $slideRepository, SettingRepository $settingRepository): Response
     {
         $periodForm = $this->createForm(ScreenOffPeriodType::class, new ScreenOffPeriod());
         $slideForm = $this->createForm(SlideUploadType::class);
+        $originForm = $this->createForm(OriginType::class, $settingRepository->getOrCreate());
 
         return $this->render('admin/dashboard.html.twig', [
             'periodForm' => $periodForm,
             'periods' => $screenOffPeriodRepository->findAllOrdered(),
             'slideForm' => $slideForm,
             'slides' => $slideRepository->findAllOrdered(),
+            'originForm' => $originForm,
         ]);
+    }
+
+    #[Route('/origin', name: 'admin_origin', methods: ['POST'])]
+    public function origin(Request $request, SettingRepository $settingRepository, EntityManagerInterface $em): Response
+    {
+        $setting = $settingRepository->getOrCreate();
+        $form = $this->createForm(OriginType::class, $setting);
+        $form->handleRequest($request);
+
+        if ($form->isSubmitted() && $form->isValid()) {
+            $em->flush();
+            $this->addFlash('success', 'Adresse enregistrée.');
+        } else {
+            $this->addFlash('error', 'Adresse invalide.');
+        }
+
+        return $this->redirectToRoute('admin_dashboard');
     }
 
     #[Route('/screen-off', name: 'admin_screen_off_new', methods: ['POST'])]
@@ -53,21 +75,21 @@ class AdminController extends AbstractController
     }
 
     #[Route('/screen-off/{id}/toggle', name: 'admin_screen_off_toggle', methods: ['POST'])]
-    public function toggleScreenOffPeriod(ScreenOffPeriod $period, EntityManagerInterface $em): Response
+    public function toggleScreenOffPeriod(ScreenOffPeriod $period, EntityManagerInterface $em): JsonResponse
     {
         $period->setEnabled(!$period->isEnabled());
         $em->flush();
 
-        return $this->redirectToRoute('admin_dashboard');
+        return $this->json(['enabled' => $period->isEnabled()]);
     }
 
     #[Route('/screen-off/{id}/delete', name: 'admin_screen_off_delete', methods: ['POST'])]
-    public function deleteScreenOffPeriod(ScreenOffPeriod $period, EntityManagerInterface $em): Response
+    public function deleteScreenOffPeriod(ScreenOffPeriod $period, EntityManagerInterface $em): JsonResponse
     {
         $em->remove($period);
         $em->flush();
 
-        return $this->redirectToRoute('admin_dashboard');
+        return $this->json(['deleted' => true]);
     }
 
     #[Route('/slides', name: 'admin_slide_upload', methods: ['POST'])]
@@ -110,16 +132,16 @@ class AdminController extends AbstractController
     }
 
     #[Route('/slides/{id}/toggle', name: 'admin_slide_toggle', methods: ['POST'])]
-    public function toggleSlide(Slide $slide, EntityManagerInterface $em): Response
+    public function toggleSlide(Slide $slide, EntityManagerInterface $em): JsonResponse
     {
         $slide->setActive(!$slide->isActive());
         $em->flush();
 
-        return $this->redirectToRoute('admin_dashboard');
+        return $this->json(['active' => $slide->isActive()]);
     }
 
     #[Route('/slides/{id}/delete', name: 'admin_slide_delete', methods: ['POST'])]
-    public function deleteSlide(Slide $slide, EntityManagerInterface $em): Response
+    public function deleteSlide(Slide $slide, EntityManagerInterface $em): JsonResponse
     {
         $path = $this->getParameter('kernel.project_dir').'/public/uploads/slides/'.$slide->getFilename();
         if (is_file($path)) {
@@ -129,6 +151,6 @@ class AdminController extends AbstractController
         $em->remove($slide);
         $em->flush();
 
-        return $this->redirectToRoute('admin_dashboard');
+        return $this->json(['deleted' => true]);
     }
 }

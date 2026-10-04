@@ -1,0 +1,49 @@
+{% extends 'base.html.twig' %}
+
+{% block stylesheets %}
+    <link rel="stylesheet" href="{{ asset('styles/admin.css') }}">
+{% endblock %}
+
+{% block body_attr %} class="admin-body" data-controller="theme"{% endblock %}
+
+{% block body %}
+        <div class="admin-wrap{{ admin_wrap_class is defined ? ' ' ~ admin_wrap_class : '' }}">
+            <div class="admin-header">
+                <h1>{% block admin_title %}🚏 Administration{% endblock %}</h1>
+                <nav class="admin-nav">
+                    <a href="{{ path('admin_dashboard') }}"{{ app.request.attributes.get('_route') == 'admin_dashboard' ? ' class="active"' : '' }}>Admin</a>
+                    <a href="{{ path('admin_preset_index') }}"{{ app.request.attributes.get('_route') starts with 'admin_preset' ? ' class="active"' : '' }}>Destinations</a>
+                    <a href="{{ path('admin_calendar') }}"{{ app.request.attributes.get('_route') starts with 'admin_calendar' ? ' class="active"' : '' }}>Calendrier</a>
+                    <a href="{{ path('home') }}">Tableau</a>
+                    <button type="button" class="theme-toggle" data-action="theme#toggle" title="Changer de thème">
+                        <span data-theme-target="icon">🌙</span>
+                    </button>
+                    <a href="{{ path('admin_logout') }}">Déconnexion</a>
+                </nav>
+            </div>
+
+            <div class="flash-stack" id="flash-stack">
+                {% for message in app.flashes('success') %}
+                    <div class="flash success">{{ message }}</div>
+                {% endfor %}
+                {% for message in app.flashes('error') %}
+                    <div class="flash error">{{ message }}</div>
+                {% endfor %}
+            </div>
+
+            {% block admin_body %}{% endblock %}
+        </div>
+
+        <script>
+            setTimeout(() => {
+                document.querySelectorAll('#flash-stack .flash').forEach((el, i) => {
+                    setTimeout(() => {
+                        el.style.transition = 'opacity 0.3s ease, transform 0.3s ease';
+                        el.style.opacity = '0';
+                        el.style.transform = 'translateY(-6px)';
+                        setTimeout(() => el.remove(), 300);
+                    }, i * 120);
+                });
+            }, 3200);
+        </script>
+{% endblock %}

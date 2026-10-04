@@ -16,10 +16,6 @@ use Symfony\Bundle\FrameworkBundle\Controller\AbstractController;
 
 class DeparturesController extends AbstractController
 {
-    /** Coordinates of "Lycée Václav Havel", used as the itinerary's starting point. */
-    private const ORIGIN_LAT = 44.786049;
-    private const ORIGIN_LNG = -0.564053;
-
     #[Route('/', name: 'home', methods: ['GET'])]
     public function index(): Response
     {
@@ -62,11 +58,11 @@ class DeparturesController extends AbstractController
         $activePreset = $setting->getActiveOverride($now) ?? $presetRepository->findScheduledForNow($localNow);
 
         if ($activePreset !== null) {
-            $slides = [$itineraryBuilder->build($activePreset, self::ORIGIN_LAT, self::ORIGIN_LNG)];
+            $slides = [$itineraryBuilder->build($activePreset, $setting->getOriginLat(), $setting->getOriginLng())];
         } else {
             $slides = $tbm->getDepartures();
 
-            if ($bikesSlide = $vcubService->buildSlide(self::ORIGIN_LAT, self::ORIGIN_LNG)) {
+            if ($bikesSlide = $vcubService->buildSlide($setting->getOriginLat(), $setting->getOriginLng())) {
                 $slides[] = $bikesSlide;
             }
         }
