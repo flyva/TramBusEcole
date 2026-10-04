@@ -6,6 +6,7 @@ use App\Entity\ScreenOffPeriod;
 use App\Entity\Slide;
 use App\Form\OriginType;
 use App\Form\ScreenOffPeriodType;
+use App\Form\SlideTextType;
 use App\Form\SlideUploadType;
 use App\Repository\ScreenOffPeriodRepository;
 use App\Repository\SettingRepository;
@@ -28,12 +29,14 @@ class AdminController extends AbstractController
     {
         $periodForm = $this->createForm(ScreenOffPeriodType::class, new ScreenOffPeriod());
         $slideForm = $this->createForm(SlideUploadType::class);
+        $slideTextForm = $this->createForm(SlideTextType::class, new Slide());
         $originForm = $this->createForm(OriginType::class, $settingRepository->getOrCreate());
 
         return $this->render('admin/dashboard.html.twig', [
             'periodForm' => $periodForm,
             'periods' => $screenOffPeriodRepository->findAllOrdered(),
             'slideForm' => $slideForm,
+            'slideTextForm' => $slideTextForm,
             'slides' => $slideRepository->findAllOrdered(),
             'originForm' => $originForm,
         ]);
@@ -115,11 +118,7 @@ class AdminController extends AbstractController
             }
 
             $slide->setFilename($newFilename);
-            $maxPosition = 0;
-            foreach ($slideRepository->findAllOrdered() as $existing) {
-                $maxPosition = max($maxPosition, $existing->getPosition());
-            }
-            $slide->setPosition($maxPosition + 1);
+            $slide->setPosition($this->nextSlidePosition($slideRepository));
 
             $em->persist($slide);
             $em->flush();
@@ -129,6 +128,36 @@ class AdminController extends AbstractController
         }
 
         return $this->redirectToRoute('admin_dashboard');
+    }
+
+    #[Route('/slides/text', name: 'admin_slide_text_new', methods: ['POST'])]
+    public function addTextSlide(Request $request, EntityManagerInterface $em, SlideRepository $slideRepository): Response
+    {
+        $slide = (new Slide())->setType(Slide::TYPE_TEXT);
+        $form = $this->createForm(SlideTextType::class, $slide);
+        $form->handleRequest($request);
+
+        if ($form->isSubmitted() && $form->isValid()) {
+            $slide->setPosition($this->nextSlidePosition($slideRepository));
+
+            $em->persist($slide);
+            $em->flush();
+            $this->addFlash('success', 'Rappel ajouté.');
+        } else {
+            $this->addFlash('error', "Impossible d'ajouter ce rappel.");
+        }
+
+        return $this->redirectToRoute('admin_dashboard');
+    }
+
+    private function nextSlidePosition(SlideRepository $slideRepository): int
+    {
+        $maxPosition = 0;
+        foreach ($slideRepository->findAllOrdered() as $existing) {
+            $maxPosition = max($maxPosition, $existing->getPosition());
+        }
+
+        return $maxPosition + 1;
     }
 
     #[Route('/slides/{id}/toggle', name: 'admin_slide_toggle', methods: ['POST'])]
@@ -143,9 +172,11 @@ class AdminController extends AbstractController
     #[Route('/slides/{id}/delete', name: 'admin_slide_delete', methods: ['POST'])]
     public function deleteSlide(Slide $slide, EntityManagerInterface $em): JsonResponse
     {
-        $path = $this->getParameter('kernel.project_dir').'/public/uploads/slides/'.$slide->getFilename();
-        if (is_file($path)) {
-            @unlink($path);
+        if ($slide->getFilename() !== null) {
+            $path = $this->getParameter('kernel.project_dir').'/public/uploads/slides/'.$slide->getFilename();
+            if (is_file($path)) {
+                @unlink($path);
+            }
         }
 
         $em->remove($slide);

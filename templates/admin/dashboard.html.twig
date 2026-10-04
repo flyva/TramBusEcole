@@ -74,25 +74,44 @@
     </div>
 
     <div class="card">
-        <h2>Images du diaporama (<span id="slide-count">{{ slides|length }}</span>)</h2>
+        <h2>📝 Ajouter un rappel (texte)</h2>
+        {{ form_start(slideTextForm, {action: path('admin_slide_text_new')}) }}
+            {{ form_label(slideTextForm.caption) }}
+            {{ form_widget(slideTextForm.caption) }}
+            {{ form_label(slideTextForm.text) }}
+            {{ form_widget(slideTextForm.text) }}
+            {{ form_errors(slideTextForm.text) }}
+            <button type="submit" class="primary">Ajouter</button>
+        {{ form_end(slideTextForm) }}
+    </div>
+
+    <div class="card">
+        <h2>Diaporama (<span id="slide-count">{{ slides|length }}</span>)</h2>
         <div class="slide-list" id="slide-list" data-controller="admin-ajax">
             {% if slides is empty %}
-                <p class="empty" id="slide-empty">Aucune image ajoutée pour l'instant.</p>
+                <p class="empty" id="slide-empty">Rien ajouté pour l'instant.</p>
             {% endif %}
             {% for slide in slides %}
                 <div class="slide-row{{ slide.active ? '' : ' inactive' }}" data-slide-row="{{ slide.id }}">
-                    <img src="{{ asset('uploads/slides/' ~ slide.filename) }}" alt="">
-                    <div class="caption">
-                        {{ slide.caption ?: 'Sans légende' }}
-                        <small>{{ slide.active ? 'Active' : 'Désactivée' }}</small>
-                    </div>
+                    {% if slide.type == 'text' %}
+                        <div class="caption">
+                            <strong>{{ slide.caption ?: 'Rappel' }}</strong> — {{ slide.text|length > 60 ? slide.text|slice(0, 60) ~ '…' : slide.text }}
+                            <small>{{ slide.active ? 'Active' : 'Désactivée' }}</small>
+                        </div>
+                    {% else %}
+                        <img src="{{ asset('uploads/slides/' ~ slide.filename) }}" alt="">
+                        <div class="caption">
+                            {{ slide.caption ?: 'Sans légende' }}
+                            <small>{{ slide.active ? 'Active' : 'Désactivée' }}</small>
+                        </div>
+                    {% endif %}
                     <button type="button" class="btn-small" data-action="admin-ajax#toggle"
                             data-url="{{ path('admin_slide_toggle', {id: slide.id}) }}">
                         {{ slide.active ? 'Désactiver' : 'Activer' }}
                     </button>
                     <button type="button" class="btn-small danger" data-action="admin-ajax#delete"
                             data-url="{{ path('admin_slide_delete', {id: slide.id}) }}"
-                            data-confirm="Supprimer cette image ?" data-remove-target="slide">
+                            data-confirm="Supprimer ce slide ?" data-remove-target="slide">
                         Supprimer
                     </button>
                 </div>

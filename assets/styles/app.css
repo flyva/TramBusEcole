@@ -83,6 +83,33 @@ html:has(body > .board) {
     text-align: center;
 }
 
+.text-slide {
+    flex: 1;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    text-align: center;
+    min-height: 0;
+    gap: 2vh;
+    padding: 0 4vw;
+}
+
+.text-slide-title {
+    color: var(--urgent);
+    font-weight: 800;
+    text-transform: uppercase;
+    letter-spacing: 0.04em;
+    font-size: clamp(1.2rem, 3vw, 2.2rem);
+}
+
+.text-slide-body {
+    font-weight: 800;
+    line-height: 1.25;
+    font-size: clamp(2.5rem, 7vw, 6.5rem);
+    overflow-wrap: break-word;
+}
+
 .slide-title {
     display: flex;
     align-items: baseline;

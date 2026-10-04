@@ -77,6 +77,11 @@ export default class extends Controller {
             return;
         }
 
+        if (slide.type === 'text') {
+            this.slideTarget.innerHTML = this.renderTextSlide(slide);
+            return;
+        }
+
         if (slide.type === 'itinerary') {
             this.slideTarget.innerHTML = this.renderItinerarySlide(slide);
             return;
@@ -182,6 +187,24 @@ export default class extends Controller {
                 ${caption}
             </div>
         `;
+    }
+
+    renderTextSlide(slide) {
+        const title = slide.caption ? `<div class="text-slide-title">${this.escapeHtml(slide.caption)}</div>` : '';
+        const body = this.escapeHtml(slide.text || '').replace(/\n/g, '<br>');
+
+        return `
+            <div class="text-slide">
+                ${title}
+                <div class="text-slide-body">${body}</div>
+            </div>
+        `;
+    }
+
+    escapeHtml(value) {
+        const div = document.createElement('div');
+        div.textContent = value;
+        return div.innerHTML;
     }
 
     severityRank(severite) {

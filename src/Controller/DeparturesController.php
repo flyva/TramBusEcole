@@ -2,6 +2,7 @@
 
 namespace App\Controller;
 
+use App\Entity\Slide;
 use App\Repository\PresetRepository;
 use App\Repository\ScreenOffPeriodRepository;
 use App\Repository\SettingRepository;
@@ -68,11 +69,17 @@ class DeparturesController extends AbstractController
         }
 
         foreach ($slideRepository->findActiveOrdered() as $slide) {
-            $slides[] = [
-                'type' => 'image',
-                'imageUrl' => '/uploads/slides/'.$slide->getFilename(),
-                'caption' => $slide->getCaption(),
-            ];
+            $slides[] = $slide->getType() === Slide::TYPE_TEXT
+                ? [
+                    'type' => 'text',
+                    'text' => $slide->getText(),
+                    'caption' => $slide->getCaption(),
+                ]
+                : [
+                    'type' => 'image',
+                    'imageUrl' => '/uploads/slides/'.$slide->getFilename(),
+                    'caption' => $slide->getCaption(),
+                ];
         }
 
         return $this->json([
