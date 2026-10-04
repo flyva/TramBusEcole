@@ -6,10 +6,12 @@ use App\Entity\Preset;
 use App\Service\Tbm\TbmApiClient;
 
 /**
- * Builds the "itinerary" slide for a Preset: the best nearby TBM line to
- * reach its address (skipping lines with a serious active alert in favour
+ * Builds the "itinerary" slide for a Preset: the best TBM line to board near
+ * HOME to reach the preset's address (preferring a line that serves both
+ * ends directly, then skipping lines with a serious active alert in favour
  * of the next nearest one), a driving time (TomTom), a rough transit time
- * estimate, a Maps QR code, and a couple of other nearby lines for context.
+ * estimate, a Maps QR code, and a couple of other nearby-home lines for
+ * context.
  */
 class ItineraryBuilder
 {
@@ -35,7 +37,10 @@ class ItineraryBuilder
     {
         $now = new \DateTimeImmutable('now', new \DateTimeZone('UTC'));
 
-        $stops = $this->tbm->findStopsNear($preset->getLat(), $preset->getLng(), self::SEARCH_RADIUS_METERS);
+        // Candidates are stops near HOME (that's where you'd actually board) - not
+        // near the destination, otherwise the "best line" ends up being whatever
+        // happens to stop next to the destination, regardless of where you start from.
+        $stops = $this->tbm->findStopsNear($originLat, $originLng, self::SEARCH_RADIUS_METERS);
         $stops = array_slice($stops, 0, self::MAX_STOPS_CONSIDERED);
 
         $rawByGid = [];
@@ -49,6 +54,7 @@ class ItineraryBuilder
         }
 
         $courseInfo = $this->tbm->resolveCourses(array_keys($allCoursIds));
+        $destLigneIds = $this->findLigneIdsServing($preset->getLat(), $preset->getLng());
 
         $destGids = [];
         $ligneIds = [];
@@ -100,11 +106,19 @@ class ItineraryBuilder
                 'alerts' => $alerts,
                 'maxSeverity' => $maxSeverity,
                 'nextWaitMinutes' => $passages[0]['attenteMinutes'] ?? PHP_INT_MAX,
+                // Whether this line (from home) also stops near the destination, i.e.
+                // it plausibly gets you there without changing lines.
+                'direct' => $ligneId !== null && isset($destLigneIds[$ligneId]),
             ];
         }
 
-        // Prefer candidates without a serious alert; among those, the soonest departure.
+        // Prefer a line that actually serves the destination too (no transfer needed);
+        // then no serious alert; then the soonest departure.
         usort($candidates, function (array $a, array $b) {
+            if ($a['direct'] !== $b['direct']) {
+                return $a['direct'] ? -1 : 1;
+            }
+
             $aOk = $a['maxSeverity'] < self::SERIOUS_ALERT_SEVERITY;
             $bOk = $b['maxSeverity'] < self::SERIOUS_ALERT_SEVERITY;
             if ($aOk !== $bOk) {
@@ -130,6 +144,35 @@ class ItineraryBuilder
             'primary' => $primary,
             'nearby' => $nearby,
         ];
+    }
+
+    /**
+     * Line ids with at least one upcoming departure from a stop near the
+     * given point, used to tell whether a line found near home also
+     * plausibly reaches the destination directly.
+     *
+     * @return array<int, true>
+     */
+    private function findLigneIdsServing(float $lat, float $lng): array
+    {
+        $now = new \DateTimeImmutable('now', new \DateTimeZone('UTC'));
+        $stops = array_slice($this->tbm->findStopsNear($lat, $lng, self::SEARCH_RADIUS_METERS), 0, self::MAX_STOPS_CONSIDERED);
+
+        $coursIds = [];
+        foreach ($stops as $stop) {
+            foreach ($this->tbm->fetchUpcomingAtStop($stop['gid'], $now, 1) as $record) {
+                $coursIds[$record['coursId']] = true;
+            }
+        }
+
+        $ligneIds = [];
+        foreach ($this->tbm->resolveCourses(array_keys($coursIds)) as $course) {
+            if ($course['ligneId'] !== null) {
+                $ligneIds[$course['ligneId']] = true;
+            }
+        }
+
+        return $ligneIds;
     }
 
     private function buildQrCodeUrl(Preset $preset): string
