@@ -33,7 +33,7 @@ class ScreenSchedulerCommand extends Command
             $io->comment('Aucune plage configurée, écran toujours allumé.');
             $shouldBeOn = true;
         } else {
-            $now = (new \DateTimeImmutable())->format('H:i');
+            $now = (new \DateTimeImmutable('now', new \DateTimeZone('Europe/Paris')))->format('H:i');
             $shouldBeOn = true;
             foreach ($periods as $period) {
                 if ($period->contains($now)) {
