@@ -51,6 +51,39 @@
         .btn-small { padding: 8px 14px; font-size: 0.85rem; border-radius: 6px; border: 1px solid #d1d5db; background: #fff; cursor: pointer; text-decoration: none; color: #1b1f24; display: inline-block; }
         .btn-small.primary { background: #4da3ff; color: #fff; border-color: #4da3ff; }
 
+        .paint-bar {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            flex-wrap: wrap;
+            background: #fff;
+            border: 1px solid #e5e7eb;
+            border-radius: 10px;
+            padding: 10px 12px;
+            margin-bottom: 14px;
+            position: sticky;
+            top: 8px;
+            z-index: 5;
+        }
+        .paint-bar .hint { font-size: 0.78rem; color: #6b7280; width: 100%; order: 99; }
+        .chip {
+            padding: 7px 14px;
+            border-radius: 999px;
+            border: 1px solid #d1d5db;
+            background: #fff;
+            font-size: 0.85rem;
+            font-weight: 600;
+            cursor: pointer;
+            color: #1b1f24;
+        }
+        .chip.active { background: #4da3ff; border-color: #4da3ff; color: #fff; }
+        .chip.erase { color: #b91c1c; }
+        .chip.erase.active { background: #fee2e2; border-color: #fecaca; color: #991b1b; }
+
+        .day-cell { cursor: pointer; transition: transform 0.1s ease; }
+        .day-cell.saving { opacity: 0.5; }
+        .day-cell:active { transform: scale(0.95); }
+
         @media (max-width: 480px) {
             .day-cell { min-height: 52px; padding: 4px; }
             .day-preset { font-size: 0.6rem; }
@@ -80,19 +113,30 @@
             <a href="{{ path('admin_calendar', {year: nextYear, month: nextMonth}) }}">›</a>
         </div>
 
+        {% if presets is empty %}
+            <p class="empty">Aucune destination créée. <a href="{{ path('admin_preset_new') }}">Crée-en une d'abord</a>.</p>
+        {% else %}
+            <div class="paint-bar" id="paint-bar">
+                {% for preset in presets %}
+                    <button type="button" class="chip" data-preset-id="{{ preset.id }}" data-preset-name="{{ preset.name }}">{{ preset.name }}</button>
+                {% endfor %}
+                <button type="button" class="chip erase" data-preset-id="">Effacer</button>
+                <div class="hint" id="paint-hint">Choisis une destination, puis tape sur les jours à lui assigner — tape plusieurs jours à la suite pour aller vite.</div>
+            </div>
+        {% endif %}
+
         <div class="weekdays">
             <div>Lun</div><div>Mar</div><div>Mer</div><div>Jeu</div><div>Ven</div><div>Sam</div><div>Dim</div>
         </div>
 
-        <div class="grid">
+        <div class="grid" id="calendar-grid">
             {% for day in days %}
-                <a href="{{ path('admin_calendar_day', {date: day.date|date('Y-m-d')}) }}"
-                   class="day-cell{{ day.inMonth ? '' : ' out' }}{{ day.isToday ? ' today' : '' }}">
+                <div class="day-cell{{ day.inMonth ? '' : ' out' }}{{ day.isToday ? ' today' : '' }}"
+                     data-date="{{ day.date|date('Y-m-d') }}"
+                     data-preset-id="{{ day.calendarDay ? day.calendarDay.preset.id : '' }}">
                     <div class="day-num">{{ day.date|date('j') }}</div>
-                    {% if day.calendarDay %}
-                        <span class="day-preset">{{ day.calendarDay.preset.name }}</span>
-                    {% endif %}
-                </a>
+                    <span class="day-preset"{{ day.calendarDay ? '' : ' hidden' }}>{{ day.calendarDay ? day.calendarDay.preset.name : '' }}</span>
+                </div>
             {% endfor %}
         </div>
 
@@ -101,4 +145,62 @@
             <a href="{{ path('admin_calendar_import') }}" class="btn-small">Importer un CSV</a>
         </div>
     </div>
+
+    <script>
+        (function () {
+            const bar = document.getElementById('paint-bar');
+            if (!bar) return;
+
+            const assignUrl = '{{ path('admin_calendar_assign') }}';
+            let selected = null; // { id: string, name: string } | null
+
+            bar.addEventListener('click', (e) => {
+                const chip = e.target.closest('.chip');
+                if (!chip) return;
+
+                if (selected && selected.id === chip.dataset.presetId) {
+                    selected = null;
+                } else {
+                    selected = { id: chip.dataset.presetId, name: chip.dataset.presetName || '' };
+                }
+
+                bar.querySelectorAll('.chip').forEach((c) => c.classList.toggle('active', selected && c.dataset.presetId === selected.id));
+            });
+
+            document.getElementById('calendar-grid').addEventListener('click', async (e) => {
+                if (!selected) return;
+                const cell = e.target.closest('.day-cell');
+                if (!cell || cell.classList.contains('saving')) return;
+
+                const date = cell.dataset.date;
+                const presetId = selected.id === '' ? null : selected.id;
+
+                cell.classList.add('saving');
+                try {
+                    const response = await fetch(assignUrl, {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify({ date, presetId }),
+                    });
+                    if (!response.ok) throw new Error('HTTP ' + response.status);
+                    const data = await response.json();
+
+                    const label = cell.querySelector('.day-preset');
+                    if (data.preset) {
+                        label.textContent = data.preset.name;
+                        label.hidden = false;
+                        cell.dataset.presetId = data.preset.id;
+                    } else {
+                        label.textContent = '';
+                        label.hidden = true;
+                        cell.dataset.presetId = '';
+                    }
+                } catch (err) {
+                    console.error(err);
+                } finally {
+                    cell.classList.remove('saving');
+                }
+            });
+        })();
+    </script>
 {% endblock %}

@@ -8,6 +8,7 @@ use App\Repository\PresetRepository;
 use Doctrine\ORM\EntityManagerInterface;
 use Symfony\Bundle\FrameworkBundle\Controller\AbstractController;
 use Symfony\Component\HttpFoundation\File\UploadedFile;
+use Symfony\Component\HttpFoundation\JsonResponse;
 use Symfony\Component\HttpFoundation\Request;
 use Symfony\Component\HttpFoundation\Response;
 use Symfony\Component\Routing\Attribute\Route;
@@ -16,7 +17,7 @@ use Symfony\Component\Routing\Attribute\Route;
 class CalendarController extends AbstractController
 {
     #[Route('', name: 'admin_calendar', methods: ['GET'])]
-    public function index(Request $request, CalendarDayRepository $calendarDayRepository): Response
+    public function index(Request $request, CalendarDayRepository $calendarDayRepository, PresetRepository $presetRepository): Response
     {
         $today = new \DateTimeImmutable('today');
         $year = (int) $request->query->get('year', $today->format('Y'));
@@ -61,6 +62,7 @@ class CalendarController extends AbstractController
             'nextYear' => (int) $next->format('Y'),
             'nextMonth' => (int) $next->format('n'),
             'days' => $days,
+            'presets' => $presetRepository->findAllOrdered(),
         ]);
     }
 
@@ -123,6 +125,48 @@ class CalendarController extends AbstractController
             'calendarDay' => $calendarDay,
             'presets' => $presetRepository->findAllOrdered(),
         ]);
+    }
+
+    #[Route('/assign', name: 'admin_calendar_assign', methods: ['POST'])]
+    public function assign(
+        Request $request,
+        CalendarDayRepository $calendarDayRepository,
+        PresetRepository $presetRepository,
+        EntityManagerInterface $em,
+    ): JsonResponse {
+        $payload = json_decode($request->getContent(), true) ?? [];
+        $dateStr = $payload['date'] ?? null;
+        $presetId = $payload['presetId'] ?? null;
+
+        if (!is_string($dateStr) || !preg_match('/^\d{4}-\d{2}-\d{2}$/', $dateStr)) {
+            return $this->json(['error' => 'Date invalide.'], 400);
+        }
+
+        $dateObj = new \DateTimeImmutable($dateStr);
+        $calendarDay = $calendarDayRepository->findOneByDate($dateObj);
+
+        if ($presetId === null) {
+            if ($calendarDay !== null) {
+                $em->remove($calendarDay);
+                $em->flush();
+            }
+
+            return $this->json(['date' => $dateStr, 'preset' => null]);
+        }
+
+        $preset = $presetRepository->find((int) $presetId);
+        if ($preset === null) {
+            return $this->json(['error' => 'Destination introuvable.'], 404);
+        }
+
+        if ($calendarDay === null) {
+            $calendarDay = (new CalendarDay())->setDate($dateObj);
+            $em->persist($calendarDay);
+        }
+        $calendarDay->setPreset($preset);
+        $em->flush();
+
+        return $this->json(['date' => $dateStr, 'preset' => ['id' => $preset->getId(), 'name' => $preset->getName()]]);
     }
 
     #[Route('/import/csv', name: 'admin_calendar_import', methods: ['GET', 'POST'])]
