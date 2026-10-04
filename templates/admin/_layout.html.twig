@@ -8,17 +8,28 @@
 
 {% block body %}
         <div class="admin-wrap{{ admin_wrap_class is defined ? ' ' ~ admin_wrap_class : '' }}">
-            <div class="admin-header">
-                <h1>{% block admin_title %}🚏 Administration{% endblock %}</h1>
-                <nav class="admin-nav">
-                    <a href="{{ path('admin_dashboard') }}"{{ app.request.attributes.get('_route') == 'admin_dashboard' ? ' class="active"' : '' }}>Admin</a>
-                    <a href="{{ path('admin_preset_index') }}"{{ app.request.attributes.get('_route') starts with 'admin_preset' ? ' class="active"' : '' }}>Destinations</a>
-                    <a href="{{ path('admin_calendar') }}"{{ app.request.attributes.get('_route') starts with 'admin_calendar' ? ' class="active"' : '' }}>Calendrier</a>
-                    <a href="{{ path('home') }}">Tableau</a>
-                    <button type="button" class="theme-toggle" data-action="theme#toggle" title="Changer de thème">
-                        <span data-theme-target="icon">🌙</span>
+            <div class="admin-header" data-controller="mobile-nav">
+                <div class="admin-brand">
+                    <span class="admin-brand-icon">🚏</span>
+                    <h1>{% block admin_title %}Administration{% endblock %}</h1>
+                </div>
+
+                <button type="button" class="nav-toggle" data-action="mobile-nav#toggle" aria-label="Menu">
+                    <span></span><span></span><span></span>
+                </button>
+
+                <nav class="admin-nav" data-mobile-nav-target="panel">
+                    <a class="nav-tab{{ app.request.attributes.get('_route') == 'admin_dashboard' ? ' active' : '' }}" href="{{ path('admin_dashboard') }}"><span class="nav-icon">🏠</span><span>Admin</span></a>
+                    <a class="nav-tab{{ app.request.attributes.get('_route') starts with 'admin_preset' ? ' active' : '' }}" href="{{ path('admin_preset_index') }}"><span class="nav-icon">📍</span><span>Destinations</span></a>
+                    <a class="nav-tab{{ app.request.attributes.get('_route') starts with 'admin_calendar' ? ' active' : '' }}" href="{{ path('admin_calendar') }}"><span class="nav-icon">🗓️</span><span>Calendrier</span></a>
+                    <a class="nav-tab" href="{{ path('home') }}"><span class="nav-icon">📺</span><span>Tableau</span></a>
+
+                    <div class="nav-divider"></div>
+
+                    <button type="button" class="nav-tab nav-theme" data-action="theme#toggle" title="Changer de thème">
+                        <span class="nav-icon" data-theme-target="icon">🌙</span><span>Thème</span>
                     </button>
-                    <a href="{{ path('admin_logout') }}">Déconnexion</a>
+                    <a class="nav-tab nav-logout" href="{{ path('admin_logout') }}"><span class="nav-icon">⏻</span><span>Déconnexion</span></a>
                 </nav>
             </div>
 
@@ -31,7 +42,9 @@
                 {% endfor %}
             </div>
 
-            {% block admin_body %}{% endblock %}
+            <div class="admin-content">
+                {% block admin_body %}{% endblock %}
+            </div>
         </div>
 
         <script>
