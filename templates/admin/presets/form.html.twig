@@ -50,13 +50,6 @@
                     {{ form_widget(form.lng, {attr: {'data-address-autocomplete-target': 'lng'}}) }}
                 </div>
 
-                {{ form_label(form.daysOfWeek) }}
-                <div class="days">
-                    {% for child in form.daysOfWeek %}
-                        <label>{{ form_widget(child) }} {{ child.vars.label }}</label>
-                    {% endfor %}
-                </div>
-
                 <div class="times">
                     <div>
                         {{ form_label(form.startTime) }}

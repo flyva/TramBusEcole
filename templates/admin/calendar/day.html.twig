@@ -1,0 +1,53 @@
+{% extends 'base.html.twig' %}
+
+{% block title %}{{ date|date('d/m/Y') }}{% endblock %}
+
+{% block body %}
+    <style>
+        * { box-sizing: border-box; }
+        body { background: #f2f4f7; color: #1b1f24; font-family: system-ui, sans-serif; margin: 0; }
+        .wrap { max-width: 480px; margin: 0 auto; padding: 16px 12px 64px; }
+        header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 16px; }
+        header h1 { font-size: 1.2rem; margin: 0; text-transform: capitalize; }
+        header a { color: #6b7280; text-decoration: none; font-size: 0.85rem; }
+        .card { background: #fff; border: 1px solid #e5e7eb; border-radius: 12px; padding: 20px; }
+        label { display: block; font-size: 0.85rem; color: #4b5563; margin: 4px 0 8px; }
+        select { width: 100%; padding: 12px; border-radius: 8px; border: 1px solid #d1d5db; font-size: 1rem; }
+        .preset-option { display: flex; align-items: center; gap: 10px; padding: 14px; border: 1px solid #e5e7eb; border-radius: 8px; margin-bottom: 8px; cursor: pointer; }
+        .preset-option input { width: 20px; height: 20px; }
+        .preset-option.selected { border-color: #4da3ff; background: #eff6ff; }
+        button.primary { margin-top: 16px; width: 100%; padding: 14px; border-radius: 8px; border: none; background: #4da3ff; color: #fff; font-weight: 700; font-size: 1rem; cursor: pointer; }
+        .empty { color: #9ca3af; font-style: italic; font-size: 0.9rem; }
+    </style>
+
+    <div class="wrap">
+        <header>
+            <h1>{{ dateLabel }}</h1>
+            <a href="{{ path('admin_calendar', {year: date|date('Y'), month: date|date('n')}) }}">Retour</a>
+        </header>
+
+        <div class="card">
+            {% if presets is empty %}
+                <p class="empty">Aucune destination créée. <a href="{{ path('admin_preset_new') }}">Crée-en une d'abord</a>.</p>
+            {% else %}
+                <form method="post">
+                    <label>Destination pour ce jour</label>
+
+                    <label class="preset-option{{ calendarDay is null ? ' selected' : '' }}">
+                        <input type="radio" name="preset_id" value="" {{ calendarDay is null ? 'checked' : '' }}>
+                        <span>Aucune (tableau normal)</span>
+                    </label>
+
+                    {% for preset in presets %}
+                        <label class="preset-option{{ calendarDay and calendarDay.preset.id == preset.id ? ' selected' : '' }}">
+                            <input type="radio" name="preset_id" value="{{ preset.id }}" {{ calendarDay and calendarDay.preset.id == preset.id ? 'checked' : '' }}>
+                            <span>{{ preset.name }} {% if preset.startTime %}<small>({{ preset.startTime }}–{{ preset.endTime }})</small>{% endif %}</span>
+                        </label>
+                    {% endfor %}
+
+                    <button type="submit" class="primary">Enregistrer</button>
+                </form>
+            {% endif %}
+        </div>
+    </div>
+{% endblock %}

@@ -11,8 +11,10 @@ use Doctrine\Persistence\ManagerRegistry;
  */
 class PresetRepository extends ServiceEntityRepository
 {
-    public function __construct(ManagerRegistry $registry)
-    {
+    public function __construct(
+        ManagerRegistry $registry,
+        private readonly CalendarDayRepository $calendarDayRepository,
+    ) {
         parent::__construct($registry, Preset::class);
     }
 
@@ -28,17 +30,18 @@ class PresetRepository extends ServiceEntityRepository
     }
 
     /**
-     * Finds the preset whose recurring weekly schedule currently matches,
-     * if any (first match wins).
+     * The preset scheduled for right now, per the calendar day assigned to
+     * today and that preset's own time window - or null (normal board).
      */
     public function findScheduledForNow(\DateTimeImmutable $now): ?Preset
     {
-        foreach ($this->createQueryBuilder('p')->andWhere('p.enabled = true')->getQuery()->getResult() as $preset) {
-            if ($preset->matchesSchedule($now)) {
-                return $preset;
-            }
+        $calendarDay = $this->calendarDayRepository->findOneByDate($now);
+        if ($calendarDay === null) {
+            return null;
         }
 
-        return null;
+        $preset = $calendarDay->getPreset();
+
+        return $preset->matchesTimeWindow($now) ? $preset : null;
     }
 }

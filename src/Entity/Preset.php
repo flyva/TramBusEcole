@@ -7,7 +7,9 @@ use Doctrine\ORM\Mapping as ORM;
 
 /**
  * A destination the board can show a live itinerary for (École, Travail,
- * or a one-off address), optionally tied to a recurring weekly schedule.
+ * or a one-off address). When it should be shown is driven by the calendar
+ * (CalendarDay rows), not by this entity - it only carries the time window
+ * used whichever day it's scheduled for.
  */
 #[ORM\Entity(repositoryClass: PresetRepository::class)]
 class Preset
@@ -29,20 +31,11 @@ class Preset
     #[ORM\Column]
     private ?float $lng = null;
 
-    /**
-     * ISO-8601 day numbers (1=lundi .. 7=dimanche). Empty = not scheduled,
-     * only usable via the manual "show now" override.
-     *
-     * @var int[]
-     */
-    #[ORM\Column(type: 'json')]
-    private array $daysOfWeek = [];
-
-    /** Format "HH:MM", required when daysOfWeek is non-empty. */
+    /** Format "HH:MM", the board switches to this preset from this time... */
     #[ORM\Column(length: 5, nullable: true)]
     private ?string $startTime = null;
 
-    /** Format "HH:MM", required when daysOfWeek is non-empty. */
+    /** ...until this time, format "HH:MM". */
     #[ORM\Column(length: 5, nullable: true)]
     private ?string $endTime = null;
 
@@ -110,20 +103,6 @@ class Preset
         return $this;
     }
 
-    /** @return int[] */
-    public function getDaysOfWeek(): array
-    {
-        return $this->daysOfWeek;
-    }
-
-    /** @param int[] $daysOfWeek */
-    public function setDaysOfWeek(array $daysOfWeek): static
-    {
-        $this->daysOfWeek = array_values(array_map('intval', $daysOfWeek));
-
-        return $this;
-    }
-
     public function getStartTime(): ?string
     {
         return $this->startTime;
@@ -166,16 +145,12 @@ class Preset
     }
 
     /**
-     * Whether this preset's recurring weekly schedule matches the given moment.
+     * Whether the given moment falls within this preset's time window
+     * (the day itself is decided by the calendar, not checked here).
      */
-    public function matchesSchedule(\DateTimeImmutable $now): bool
+    public function matchesTimeWindow(\DateTimeImmutable $now): bool
     {
-        if (!$this->enabled || $this->daysOfWeek === [] || $this->startTime === null || $this->endTime === null) {
-            return false;
-        }
-
-        $isoDay = (int) $now->format('N');
-        if (!in_array($isoDay, $this->daysOfWeek, true)) {
+        if (!$this->enabled || $this->startTime === null || $this->endTime === null) {
             return false;
         }
 

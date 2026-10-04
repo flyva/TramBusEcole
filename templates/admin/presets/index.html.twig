@@ -36,6 +36,7 @@
         <header>
             <h1>📍 Destinations</h1>
             <div>
+                <a href="{{ path('admin_calendar') }}">Calendrier</a> ·
                 <a href="{{ path('admin_dashboard') }}">Admin</a> ·
                 <a href="{{ path('home') }}">Voir le tableau</a> ·
                 <a href="{{ path('admin_logout') }}">Déconnexion</a>
@@ -73,11 +74,10 @@
                         </div>
                         <div class="meta">
                             {{ preset.address }}<br>
-                            {% if preset.daysOfWeek is not empty %}
-                                {% set jours = {1: 'Lun', 2: 'Mar', 3: 'Mer', 4: 'Jeu', 5: 'Ven', 6: 'Sam', 7: 'Dim'} %}
-                                {{ preset.daysOfWeek|map(d => jours[d])|join(', ') }} · {{ preset.startTime }}–{{ preset.endTime }}
+                            {% if preset.startTime and preset.endTime %}
+                                {{ preset.startTime }}–{{ preset.endTime }} les jours où elle est au calendrier
                             {% else %}
-                                Usage ponctuel uniquement
+                                Pas d'horaire défini
                             {% endif %}
                         </div>
                     </div>
