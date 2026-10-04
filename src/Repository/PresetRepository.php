@@ -35,13 +35,13 @@ class PresetRepository extends ServiceEntityRepository
      */
     public function findScheduledForNow(\DateTimeImmutable $now): ?Preset
     {
-        $calendarDay = $this->calendarDayRepository->findOneByDate($now);
-        if ($calendarDay === null) {
-            return null;
+        foreach ($this->calendarDayRepository->findByDate($now) as $calendarDay) {
+            $preset = $calendarDay->getPreset();
+            if ($preset->matchesTimeWindow($now)) {
+                return $preset;
+            }
         }
 
-        $preset = $calendarDay->getPreset();
-
-        return $preset->matchesTimeWindow($now) ? $preset : null;
+        return null;
     }
 }

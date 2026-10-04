@@ -42,16 +42,11 @@ export default class extends Controller {
             if (!response.ok) throw new Error(`HTTP ${response.status}`);
             const data = await response.json();
 
-            const label = cell.querySelector('.day-preset');
-            if (data.preset) {
-                label.textContent = data.preset.name;
-                label.hidden = false;
-                cell.dataset.presetId = data.preset.id;
-            } else {
-                label.textContent = '';
-                label.hidden = true;
-                cell.dataset.presetId = '';
-            }
+            const container = cell.querySelector('.day-presets');
+            container.innerHTML = data.presets
+                .map((p) => `<span class="day-preset">${p.name}</span>`)
+                .join('');
+            cell.dataset.presetIds = data.presets.map((p) => p.id).join(',');
         } catch (error) {
             console.error(error);
         } finally {

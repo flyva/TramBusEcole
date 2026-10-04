@@ -47,7 +47,7 @@ class CalendarController extends AbstractController
                 'date' => $cursor,
                 'inMonth' => (int) $cursor->format('n') === $month,
                 'isToday' => $key === $today->format('Y-m-d'),
-                'calendarDay' => $allAssigned[$key] ?? null,
+                'calendarDays' => $allAssigned[$key] ?? [],
             ];
             $cursor = $cursor->modify('+1 day');
         }
@@ -75,33 +75,33 @@ class CalendarController extends AbstractController
         EntityManagerInterface $em,
     ): Response {
         $dateObj = new \DateTimeImmutable($date);
-        $calendarDay = $calendarDayRepository->findOneByDate($dateObj);
+        $calendarDays = $calendarDayRepository->findByDate($dateObj);
 
         if ($request->isMethod('POST')) {
-            $presetId = $request->request->get('preset_id');
+            $presetIds = array_map('intval', $request->request->all('preset_ids'));
 
-            if ($presetId === '' || $presetId === null) {
-                if ($calendarDay !== null) {
+            // Remove assignments that were unchecked.
+            foreach ($calendarDays as $calendarDay) {
+                if (!in_array($calendarDay->getPreset()->getId(), $presetIds, true)) {
                     $em->remove($calendarDay);
-                    $em->flush();
                 }
-                $this->addFlash('success', 'Jour effacé.');
-            } else {
-                $preset = $presetRepository->find((int) $presetId);
-                if ($preset === null) {
-                    $this->addFlash('error', 'Destination introuvable.');
-
-                    return $this->redirectToRoute('admin_calendar_day', ['date' => $date]);
-                }
-
-                if ($calendarDay === null) {
-                    $calendarDay = (new CalendarDay())->setDate($dateObj);
-                    $em->persist($calendarDay);
-                }
-                $calendarDay->setPreset($preset);
-                $em->flush();
-                $this->addFlash('success', sprintf('%s assigné au %s.', $preset->getName(), $dateObj->format('d/m/Y')));
             }
+
+            // Add newly checked ones.
+            $existingPresetIds = array_map(static fn (CalendarDay $c) => $c->getPreset()->getId(), $calendarDays);
+            foreach ($presetIds as $presetId) {
+                if (in_array($presetId, $existingPresetIds, true)) {
+                    continue;
+                }
+                $preset = $presetRepository->find($presetId);
+                if ($preset === null) {
+                    continue;
+                }
+                $em->persist((new CalendarDay())->setDate($dateObj)->setPreset($preset));
+            }
+
+            $em->flush();
+            $this->addFlash('success', sprintf('Jour du %s mis à jour.', $dateObj->format('d/m/Y')));
 
             return $this->redirectToRoute('admin_calendar', [
                 'year' => $dateObj->format('Y'),
@@ -122,11 +122,17 @@ class CalendarController extends AbstractController
         return $this->render('admin/calendar/day.html.twig', [
             'date' => $dateObj,
             'dateLabel' => $dateLabel,
-            'calendarDay' => $calendarDay,
+            'selectedPresetIds' => array_map(static fn (CalendarDay $c) => $c->getPreset()->getId(), $calendarDays),
             'presets' => $presetRepository->findAllOrdered(),
         ]);
     }
 
+    /**
+     * Toggles one destination on one day: adds it if not already assigned
+     * that day, removes it if it is. A day can hold several destinations
+     * (e.g. École in the morning, Travail in the afternoon) - presetId=null
+     * clears all of them at once ("Effacer").
+     */
     #[Route('/assign', name: 'admin_calendar_assign', methods: ['POST'])]
     public function assign(
         Request $request,
@@ -143,15 +149,14 @@ class CalendarController extends AbstractController
         }
 
         $dateObj = new \DateTimeImmutable($dateStr);
-        $calendarDay = $calendarDayRepository->findOneByDate($dateObj);
 
         if ($presetId === null) {
-            if ($calendarDay !== null) {
+            foreach ($calendarDayRepository->findByDate($dateObj) as $calendarDay) {
                 $em->remove($calendarDay);
-                $em->flush();
             }
+            $em->flush();
 
-            return $this->json(['date' => $dateStr, 'preset' => null]);
+            return $this->json(['date' => $dateStr, 'presets' => []]);
         }
 
         $preset = $presetRepository->find((int) $presetId);
@@ -159,14 +164,20 @@ class CalendarController extends AbstractController
             return $this->json(['error' => 'Destination introuvable.'], 404);
         }
 
-        if ($calendarDay === null) {
-            $calendarDay = (new CalendarDay())->setDate($dateObj);
-            $em->persist($calendarDay);
+        $existing = $calendarDayRepository->findOneForDateAndPreset($dateObj, (int) $presetId);
+        if ($existing !== null) {
+            $em->remove($existing);
+        } else {
+            $em->persist((new CalendarDay())->setDate($dateObj)->setPreset($preset));
         }
-        $calendarDay->setPreset($preset);
         $em->flush();
 
-        return $this->json(['date' => $dateStr, 'preset' => ['id' => $preset->getId(), 'name' => $preset->getName()]]);
+        $presets = array_map(
+            static fn (CalendarDay $c) => ['id' => $c->getPreset()->getId(), 'name' => $c->getPreset()->getName()],
+            $calendarDayRepository->findByDate($dateObj),
+        );
+
+        return $this->json(['date' => $dateStr, 'presets' => $presets]);
     }
 
     #[Route('/import/csv', name: 'admin_calendar_import', methods: ['GET', 'POST'])]
@@ -217,12 +228,9 @@ class CalendarController extends AbstractController
                         continue;
                     }
 
-                    $calendarDay = $calendarDayRepository->findOneByDate($dateObj);
-                    if ($calendarDay === null) {
-                        $calendarDay = (new CalendarDay())->setDate($dateObj);
-                        $em->persist($calendarDay);
+                    if ($calendarDayRepository->findOneForDateAndPreset($dateObj, $preset->getId()) === null) {
+                        $em->persist((new CalendarDay())->setDate($dateObj)->setPreset($preset));
                     }
-                    $calendarDay->setPreset($preset);
                     ++$imported;
                 }
                 fclose($handle);

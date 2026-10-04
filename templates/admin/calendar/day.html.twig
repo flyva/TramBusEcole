@@ -9,19 +9,16 @@
             <p class="empty">Aucune destination créée. <a href="{{ path('admin_preset_new') }}">Crée-en une d'abord</a>.</p>
         {% else %}
             <form method="post">
-                <label>Destination pour ce jour</label>
-
-                <label class="preset-row" style="cursor: pointer; border: 1px solid var(--border); border-radius: var(--radius-sm); padding: 10px 12px;{{ calendarDay is null ? ' border-color: var(--primary);' : '' }}">
-                    <input type="radio" name="preset_id" value="" {{ calendarDay is null ? 'checked' : '' }}>
-                    <span>Aucune (tableau normal)</span>
-                </label>
+                <label>Destinations pour ce jour (une ou plusieurs)</label>
 
                 {% for preset in presets %}
-                    <label class="preset-row" style="cursor: pointer; border: 1px solid var(--border); border-radius: var(--radius-sm); padding: 10px 12px; margin-top: 6px;{{ calendarDay and calendarDay.preset.id == preset.id ? ' border-color: var(--primary);' : '' }}">
-                        <input type="radio" name="preset_id" value="{{ preset.id }}" {{ calendarDay and calendarDay.preset.id == preset.id ? 'checked' : '' }}>
+                    <label class="preset-row" style="cursor: pointer; border: 1px solid var(--border); border-radius: var(--radius-sm); padding: 10px 12px; margin-top: 6px;{{ preset.id in selectedPresetIds ? ' border-color: var(--primary);' : '' }}">
+                        <input type="checkbox" name="preset_ids[]" value="{{ preset.id }}" {{ preset.id in selectedPresetIds ? 'checked' : '' }}>
                         <span>{{ preset.name }} {% if preset.startTime %}<small>({{ preset.startTime }}–{{ preset.endTime }})</small>{% endif %}</span>
                     </label>
                 {% endfor %}
+
+                <p class="empty" style="margin-top: 10px;">Ne coche rien pour revenir au tableau normal ce jour-là.</p>
 
                 <button type="submit" class="primary">Enregistrer</button>
             </form>
