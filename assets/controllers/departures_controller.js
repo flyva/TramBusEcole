@@ -11,6 +11,7 @@ export default class extends Controller {
     connect() {
         this.slides = [];
         this.currentIndex = 0;
+        this.screenOn = true;
 
         this.fetchData();
         this.dataTimer = setInterval(() => this.fetchData(), DATA_REFRESH_MS);
@@ -36,6 +37,8 @@ export default class extends Controller {
                 throw new Error(`HTTP ${response.status}`);
             }
             const data = await response.json();
+            this.screenOn = data.screenOn !== false;
+            this.element.classList.toggle('screen-off', !this.screenOn);
             this.slides = data.slides || [];
             if (this.currentIndex >= this.slides.length) {
                 this.currentIndex = 0;
@@ -48,7 +51,7 @@ export default class extends Controller {
     }
 
     nextSlide() {
-        if (this.slides.length === 0) {
+        if (!this.screenOn || this.slides.length === 0) {
             return;
         }
         this.currentIndex = (this.currentIndex + 1) % this.slides.length;

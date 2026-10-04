@@ -38,6 +38,15 @@ html:has(body > .board) {
     padding: 2.5vh 2.5vw;
 }
 
+.board.screen-off {
+    padding: 0;
+    background: #000;
+}
+
+.board.screen-off > * {
+    display: none;
+}
+
 .slide {
     flex: 1;
     display: flex;

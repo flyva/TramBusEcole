@@ -3,6 +3,7 @@
 namespace App\Controller;
 
 use App\Repository\PresetRepository;
+use App\Repository\ScreenOffPeriodRepository;
 use App\Repository\SettingRepository;
 use App\Repository\SlideRepository;
 use App\Service\ItineraryBuilder;
@@ -33,10 +34,28 @@ class DeparturesController extends AbstractController
         PresetRepository $presetRepository,
         ItineraryBuilder $itineraryBuilder,
         VcubService $vcubService,
+        ScreenOffPeriodRepository $screenOffPeriodRepository,
     ): JsonResponse {
         $now = new \DateTimeImmutable('now', new \DateTimeZone('UTC'));
         $localNow = $now->setTimezone(new \DateTimeZone('Europe/Paris'));
         $setting = $settingRepository->getOrCreate();
+
+        $screenOn = true;
+        foreach ($screenOffPeriodRepository->findEnabled() as $period) {
+            if ($period->contains($localNow->format('H:i'))) {
+                $screenOn = false;
+                break;
+            }
+        }
+
+        if (!$screenOn) {
+            return $this->json([
+                'generatedAt' => (new \DateTimeImmutable())->format(DATE_ATOM),
+                'screenOn' => false,
+                'activePreset' => null,
+                'slides' => [],
+            ]);
+        }
 
         // Override is an absolute instant (timezone-agnostic to compare); the
         // weekly schedule is expressed in local wall-clock time.
@@ -62,6 +81,7 @@ class DeparturesController extends AbstractController
 
         return $this->json([
             'generatedAt' => (new \DateTimeImmutable())->format(DATE_ATOM),
+            'screenOn' => true,
             'activePreset' => $activePreset?->getName(),
             'slides' => $slides,
         ]);
