@@ -8,29 +8,51 @@ use Doctrine\DBAL\Schema\Schema;
 use Doctrine\Migrations\AbstractMigration;
 
 /**
- * Auto-generated Migration: Please modify to your needs!
+ * Creates the setting, slide and messenger_messages tables. Written with
+ * the portable Schema API (not raw SQL) so it works the same on SQLite and
+ * MySQL, whichever the app is configured to use.
  */
 final class Version20260916205620 extends AbstractMigration
 {
     public function getDescription(): string
     {
-        return '';
+        return 'Create setting, slide and messenger_messages tables';
     }
 
     public function up(Schema $schema): void
     {
-        // this up() migration is auto-generated, please modify it to your needs
-        $this->addSql('CREATE TABLE setting (id INTEGER PRIMARY KEY AUTOINCREMENT NOT NULL, schedule_enabled BOOLEAN DEFAULT 0 NOT NULL, screen_on_time VARCHAR(5) DEFAULT \'07:00\' NOT NULL, screen_off_time VARCHAR(5) DEFAULT \'22:00\' NOT NULL)');
-        $this->addSql('CREATE TABLE slide (id INTEGER PRIMARY KEY AUTOINCREMENT NOT NULL, filename VARCHAR(255) NOT NULL, caption VARCHAR(255) DEFAULT NULL, position INTEGER NOT NULL, active BOOLEAN DEFAULT 1 NOT NULL, created_at DATETIME NOT NULL)');
-        $this->addSql('CREATE TABLE messenger_messages (id INTEGER PRIMARY KEY AUTOINCREMENT NOT NULL, body CLOB NOT NULL, headers CLOB NOT NULL, queue_name VARCHAR(190) NOT NULL, created_at DATETIME NOT NULL, available_at DATETIME NOT NULL, delivered_at DATETIME DEFAULT NULL)');
-        $this->addSql('CREATE INDEX IDX_75EA56E0FB7336F0E3BD61CE16BA31DBBF396750 ON messenger_messages (queue_name, available_at, delivered_at, id)');
+        $setting = $schema->createTable('setting');
+        $setting->addColumn('id', 'integer', ['autoincrement' => true]);
+        $setting->addColumn('schedule_enabled', 'boolean', ['default' => false]);
+        $setting->addColumn('screen_on_time', 'string', ['length' => 5, 'default' => '07:00']);
+        $setting->addColumn('screen_off_time', 'string', ['length' => 5, 'default' => '22:00']);
+        $setting->setPrimaryKey(['id']);
+
+        $slide = $schema->createTable('slide');
+        $slide->addColumn('id', 'integer', ['autoincrement' => true]);
+        $slide->addColumn('filename', 'string', ['length' => 255]);
+        $slide->addColumn('caption', 'string', ['length' => 255, 'notnull' => false]);
+        $slide->addColumn('position', 'integer');
+        $slide->addColumn('active', 'boolean', ['default' => true]);
+        $slide->addColumn('created_at', 'datetime_immutable');
+        $slide->setPrimaryKey(['id']);
+
+        $messenger = $schema->createTable('messenger_messages');
+        $messenger->addColumn('id', 'integer', ['autoincrement' => true]);
+        $messenger->addColumn('body', 'text');
+        $messenger->addColumn('headers', 'text');
+        $messenger->addColumn('queue_name', 'string', ['length' => 190]);
+        $messenger->addColumn('created_at', 'datetime_immutable');
+        $messenger->addColumn('available_at', 'datetime_immutable');
+        $messenger->addColumn('delivered_at', 'datetime_immutable', ['notnull' => false]);
+        $messenger->setPrimaryKey(['id']);
+        $messenger->addIndex(['queue_name', 'available_at', 'delivered_at', 'id'], 'IDX_75EA56E0FB7336F0E3BD61CE16BA31DBBF396750');
     }
 
     public function down(Schema $schema): void
     {
-        // this down() migration is auto-generated, please modify it to your needs
-        $this->addSql('DROP TABLE setting');
-        $this->addSql('DROP TABLE slide');
-        $this->addSql('DROP TABLE messenger_messages');
+        $schema->dropTable('messenger_messages');
+        $schema->dropTable('slide');
+        $schema->dropTable('setting');
     }
 }
