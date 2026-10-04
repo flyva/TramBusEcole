@@ -74,6 +74,16 @@ export default class extends Controller {
             return;
         }
 
+        if (slide.type === 'itinerary') {
+            this.slideTarget.innerHTML = this.renderItinerarySlide(slide);
+            return;
+        }
+
+        if (slide.type === 'bikes') {
+            this.slideTarget.innerHTML = this.renderBikesSlide(slide);
+            return;
+        }
+
         const icon = slide.mode === 'TRAM' ? '🚊' : '🚌';
         const columnsHtml = slide.columns.map((c) => this.renderColumn(c)).join('');
 
@@ -84,6 +94,74 @@ export default class extends Controller {
             </div>
             ${this.renderAlerts(slide.alerts)}
             <div class="columns">${columnsHtml}</div>
+        `;
+    }
+
+    renderItinerarySlide(slide) {
+        const primary = slide.primary;
+        const metaHtml = `
+            <div class="itinerary-meta">
+                ${slide.drivingMinutes !== null ? `<span>🚗 ${slide.drivingMinutes} min</span>` : ''}
+                <span>🚊 ~${slide.transitEstimateMinutes} min <small>(estimation)</small></span>
+            </div>
+        `;
+
+        const primaryHtml = primary
+            ? `
+                <div class="destination">→ ${primary.stopLibelle}</div>
+                ${primary.ligne ? `<span class="ligne">${primary.ligne}</span>` : ''}
+                ${this.renderAlerts(primary.alerts)}
+                ${primary.passages.map((p, i) => this.renderDeparture(p, i + 1)).join('')}
+            `
+            : '<p class="empty">Aucune ligne TBM trouvée à proximité</p>';
+
+        const nearbyHtml = (slide.nearby || []).length
+            ? slide.nearby.map((n) => `
+                <div class="itinerary-nearby-item">
+                    ${n.ligne ? `<span class="ligne">${n.ligne}</span>` : ''}
+                    <span class="destination">${n.stopLibelle}</span>
+                    ${n.passages[0] ? `<span class="departure-wait">${n.passages[0].attenteMinutes}<span class="unit">min</span></span>` : ''}
+                </div>
+            `).join('')
+            : '<p class="empty">Pas d\'autre ligne proche</p>';
+
+        return `
+            <div class="slide-title mode-itinerary">
+                <span class="icon">🧭</span>
+                <span class="name">${slide.presetName}</span>
+            </div>
+            <div class="columns">
+                <div class="column itinerary-left">
+                    ${primaryHtml}
+                    ${metaHtml}
+                </div>
+                <div class="column itinerary-right">
+                    <div class="itinerary-qr">
+                        <img src="${slide.qrCodeUrl}" alt="QR code itinéraire">
+                        <div class="itinerary-address">${slide.address}</div>
+                    </div>
+                    ${nearbyHtml}
+                </div>
+            </div>
+        `;
+    }
+
+    renderBikesSlide(slide) {
+        const rows = slide.stations.map((s) => `
+            <div class="bike-row">
+                <span class="bike-name">${s.nom}</span>
+                <span class="bike-count">🚲 ${s.velos}</span>
+                <span class="bike-count">⚡ ${s.elec}</span>
+                <span class="bike-count">🅿️ ${s.places}</span>
+            </div>
+        `).join('');
+
+        return `
+            <div class="slide-title mode-bikes">
+                <span class="icon">🚲</span>
+                <span class="name">${slide.title}</span>
+            </div>
+            <div class="column bikes-column">${rows}</div>
         `;
     }
 

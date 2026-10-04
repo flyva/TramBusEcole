@@ -2,11 +2,11 @@
 
 namespace App\Service;
 
-use Symfony\Contracts\HttpClient\HttpClientInterface;
+use App\Service\Tbm\TbmApiClient;
 
 /**
- * Fetches upcoming bus/tram departures from Bordeaux Métropole's open data
- * SAEIV feed (opendata.bordeaux-metropole.fr) for the "Lycée Václav Havel" stop.
+ * Builds the main departures board (one "slide" per line: tram, then each
+ * bus line) for the "Lycée Václav Havel" stop, using the shared TbmApiClient.
  *
  * Returns one "slide" per line (tram, then bus Lianes 5, ...), each with a
  * fixed left/right column per direction of travel. The destination shown for
@@ -17,8 +17,6 @@ use Symfony\Contracts\HttpClient\HttpClientInterface;
  */
 class TbmDeparturesService
 {
-    private const API_URL = 'https://opendata.bordeaux-metropole.fr/api/records/1.0/search/';
-
     /**
      * Physical stop platforms located at "Lycée Václav Havel" (Bègles), paired
      * by "group" so each line always renders as a stable 2-column slide.
@@ -47,7 +45,7 @@ class TbmDeparturesService
         'bus-89' => 109,
     ];
 
-    public function __construct(private readonly HttpClientInterface $httpClient)
+    public function __construct(private readonly TbmApiClient $tbm)
     {
     }
 
@@ -61,14 +59,14 @@ class TbmDeparturesService
         $allCoursIds = [];
 
         foreach (self::STOPS as $stop) {
-            $records = $this->fetchUpcoming($stop['gid'], $now);
+            $records = $this->tbm->fetchUpcomingAtStop($stop['gid'], $now, self::MAX_PER_COLUMN);
             $rawByGid[$stop['gid']] = $records;
             foreach ($records as $record) {
                 $allCoursIds[$record['coursId']] = true;
             }
         }
 
-        $courseInfo = $this->resolveCourses(array_keys($allCoursIds));
+        $courseInfo = $this->tbm->resolveCourses(array_keys($allCoursIds));
 
         $destGids = [];
         foreach ($courseInfo as $course) {
@@ -76,9 +74,9 @@ class TbmDeparturesService
                 $destGids[$course['destGid']] = true;
             }
         }
-        $destNames = $this->resolveStopNames(array_keys($destGids));
+        $destNames = $this->tbm->resolveStopNames(array_keys($destGids));
 
-        $alertsByLigne = $this->fetchAlerts(array_values(self::LIGNE_ID_BY_GROUP));
+        $alertsByLigne = $this->tbm->fetchAlerts(array_values(self::LIGNE_ID_BY_GROUP));
 
         // Group stops by their pairing key, keeping STOPS order for stable left/right columns.
         $groups = [];
@@ -126,204 +124,5 @@ class TbmDeparturesService
         }
 
         return $slides;
-    }
-
-    /**
-     * @return array<int, array{coursId: int, time: \DateTimeImmutable}>
-     */
-    private function fetchUpcoming(int $stopGid, \DateTimeImmutable $now): array
-    {
-        $response = $this->httpClient->request('GET', self::API_URL, [
-            'query' => [
-                'dataset' => 'sv_horai_a',
-                'q' => sprintf('rs_sv_arret_p=%d', $stopGid),
-                'rows' => 100,
-            ],
-        ]);
-
-        $data = $response->toArray(false);
-        $records = [];
-
-        foreach ($data['records'] ?? [] as $record) {
-            $fields = $record['fields'];
-            $timeString = $fields['hor_real'] ?? $fields['hor_estime'] ?? $fields['hor_app'] ?? $fields['hor_theo'] ?? null;
-            if ($timeString === null || !isset($fields['rs_sv_cours_a'])) {
-                continue;
-            }
-
-            $time = new \DateTimeImmutable($timeString);
-            if ($time < $now->modify('-1 minute')) {
-                continue;
-            }
-
-            $records[] = [
-                'coursId' => (int) $fields['rs_sv_cours_a'],
-                'time' => $time,
-            ];
-        }
-
-        usort($records, fn (array $a, array $b) => $a['time'] <=> $b['time']);
-
-        return array_slice($records, 0, self::MAX_PER_COLUMN);
-    }
-
-    /**
-     * @param int[] $coursIds
-     * @return array<int, array{ligne: ?string, destGid: ?int}>
-     */
-    private function resolveCourses(array $coursIds): array
-    {
-        if ($coursIds === []) {
-            return [];
-        }
-
-        $query = implode(' OR ', array_map(fn (int $id) => "bm_gid=$id", $coursIds));
-
-        $response = $this->httpClient->request('GET', self::API_URL, [
-            'query' => [
-                'dataset' => 'sv_cours_a',
-                'q' => $query,
-                'rows' => count($coursIds),
-            ],
-        ]);
-
-        $data = $response->toArray(false);
-        $ligneIds = [];
-        $courses = [];
-
-        foreach ($data['records'] ?? [] as $record) {
-            $fields = $record['fields'];
-            $ligneId = $fields['bm_rs_sv_ligne_a'] ?? null;
-            $courses[(int) $fields['bm_gid']] = [
-                'ligneId' => $ligneId,
-                'destGid' => $fields['bm_rg_sv_arret_p_nd'] ?? null,
-            ];
-            if ($ligneId !== null) {
-                $ligneIds[$ligneId] = true;
-            }
-        }
-
-        $ligneLabels = $this->resolveLignes(array_keys($ligneIds));
-
-        $result = [];
-        foreach ($courses as $coursId => $course) {
-            $result[$coursId] = [
-                'ligne' => $course['ligneId'] !== null ? ($ligneLabels[$course['ligneId']] ?? null) : null,
-                'destGid' => $course['destGid'],
-            ];
-        }
-
-        return $result;
-    }
-
-    /**
-     * @param int[] $ligneIds
-     * @return array<int, string>
-     */
-    private function resolveLignes(array $ligneIds): array
-    {
-        if ($ligneIds === []) {
-            return [];
-        }
-
-        $query = implode(' OR ', array_map(fn (int $id) => "bm_gid=$id", $ligneIds));
-
-        $response = $this->httpClient->request('GET', self::API_URL, [
-            'query' => [
-                'dataset' => 'sv_ligne_a',
-                'q' => $query,
-                'rows' => count($ligneIds),
-            ],
-        ]);
-
-        $data = $response->toArray(false);
-        $labels = [];
-        foreach ($data['records'] ?? [] as $record) {
-            $fields = $record['fields'];
-            $labels[(int) $fields['bm_gid']] = $this->simplifyLigneLabel($fields['bm_libelle']);
-        }
-
-        return $labels;
-    }
-
-    /**
-     * TBM labels most bus lines "Principale N" or "Locale N" - simplify to "Liane N".
-     */
-    private function simplifyLigneLabel(string $label): string
-    {
-        if (preg_match('/^(Principale|Locale)\s+(\d+)$/i', $label, $matches)) {
-            return "Liane {$matches[2]}";
-        }
-
-        return $label;
-    }
-
-    /**
-     * @param int[] $ligneIds
-     * @return array<int, array<int, array{titre: string, severite: string}>>
-     */
-    private function fetchAlerts(array $ligneIds): array
-    {
-        if ($ligneIds === []) {
-            return [];
-        }
-
-        $query = implode(' OR ', array_map(fn (int $id) => "rs_sv_ligne_a=$id", $ligneIds));
-
-        $response = $this->httpClient->request('GET', self::API_URL, [
-            'query' => [
-                'dataset' => 'sv_messa_a',
-                'q' => $query,
-                'rows' => 50,
-            ],
-        ]);
-
-        $data = $response->toArray(false);
-        $byLigne = [];
-
-        foreach ($data['records'] ?? [] as $record) {
-            $fields = $record['fields'];
-            $ligneId = $fields['rs_sv_ligne_a'] ?? null;
-            if ($ligneId === null) {
-                continue;
-            }
-
-            $byLigne[(int) $ligneId][] = [
-                'titre' => $fields['titre'] ?? ($fields['message'] ?? 'Info trafic'),
-                'severite' => $fields['severite'] ?? '1_FAIBLE',
-            ];
-        }
-
-        return $byLigne;
-    }
-
-    /**
-     * @param int[] $gids
-     * @return array<int, string>
-     */
-    private function resolveStopNames(array $gids): array
-    {
-        if ($gids === []) {
-            return [];
-        }
-
-        $query = implode(' OR ', array_map(fn (int $id) => "gid=$id", $gids));
-
-        $response = $this->httpClient->request('GET', self::API_URL, [
-            'query' => [
-                'dataset' => 'sv_arret_p',
-                'q' => $query,
-                'rows' => count($gids),
-            ],
-        ]);
-
-        $data = $response->toArray(false);
-        $names = [];
-        foreach ($data['records'] ?? [] as $record) {
-            $fields = $record['fields'];
-            $names[(int) $fields['gid']] = $fields['libelle'];
-        }
-
-        return $names;
     }
 }

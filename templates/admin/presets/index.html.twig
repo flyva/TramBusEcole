@@ -1,0 +1,103 @@
+{% extends 'base.html.twig' %}
+
+{% block title %}Destinations{% endblock %}
+
+{% block body %}
+    <style>
+        body { background: #f2f4f7; color: #1b1f24; font-family: system-ui, sans-serif; margin: 0; }
+        .wrap { max-width: 760px; margin: 0 auto; padding: 24px 16px 64px; }
+        header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 24px; }
+        header h1 { font-size: 1.4rem; margin: 0; }
+        header a { color: #6b7280; text-decoration: none; font-size: 0.9rem; }
+        .card { background: #fff; border: 1px solid #e5e7eb; border-radius: 12px; padding: 20px; margin-bottom: 20px; }
+        .flash { padding: 10px 14px; border-radius: 8px; margin-bottom: 16px; font-size: 0.9rem; }
+        .flash.success { background: #dcfce7; color: #166534; }
+        .flash.error { background: #fee2e2; color: #991b1b; }
+        .btn-small { padding: 6px 12px; font-size: 0.8rem; border-radius: 5px; border: 1px solid #d1d5db; background: #fff; cursor: pointer; text-decoration: none; color: #1b1f24; display: inline-block; }
+        .btn-small.danger { color: #b91c1c; border-color: #fecaca; }
+        .btn-small.primary { background: #4da3ff; color: #fff; border-color: #4da3ff; }
+        .preset-row { display: flex; align-items: center; gap: 12px; padding: 12px 0; border-bottom: 1px solid #e5e7eb; }
+        .preset-row:last-child { border-bottom: none; }
+        .preset-info { flex: 1; }
+        .preset-info .name { font-weight: 700; }
+        .preset-info .meta { color: #6b7280; font-size: 0.85rem; }
+        .badge { display: inline-block; padding: 2px 8px; border-radius: 999px; font-size: 0.75rem; font-weight: 600; margin-left: 6px; }
+        .badge.off { background: #f3f4f6; color: #6b7280; }
+        .badge.on { background: #dcfce7; color: #166534; }
+        .actions { display: flex; gap: 6px; flex-wrap: wrap; align-items: center; }
+        .actions form { display: inline; }
+        .override-banner { background: #fff7ed; border: 1px solid #fed7aa; color: #9a3412; padding: 12px 16px; border-radius: 10px; margin-bottom: 20px; display: flex; justify-content: space-between; align-items: center; }
+        .add-link { display: inline-block; margin-bottom: 16px; }
+        .empty { color: #9ca3af; font-style: italic; font-size: 0.9rem; }
+        select.hours { padding: 4px; border-radius: 5px; border: 1px solid #d1d5db; }
+    </style>
+
+    <div class="wrap">
+        <header>
+            <h1>📍 Destinations</h1>
+            <div>
+                <a href="{{ path('admin_dashboard') }}">Admin</a> ·
+                <a href="{{ path('home') }}">Voir le tableau</a> ·
+                <a href="{{ path('admin_logout') }}">Déconnexion</a>
+            </div>
+        </header>
+
+        {% for message in app.flashes('success') %}
+            <div class="flash success">{{ message }}</div>
+        {% endfor %}
+        {% for message in app.flashes('error') %}
+            <div class="flash error">{{ message }}</div>
+        {% endfor %}
+
+        {% if activeOverride %}
+            <div class="override-banner">
+                <span>📌 Affichage forcé : <strong>{{ activeOverride.name }}</strong> jusqu'à {{ setting.overrideUntil|date('H:i', 'Europe/Paris') }}</span>
+                <form method="post" action="{{ path('admin_preset_override_clear') }}">
+                    <button type="submit" class="btn-small">Arrêter</button>
+                </form>
+            </div>
+        {% endif %}
+
+        <a href="{{ path('admin_preset_new') }}" class="btn-small primary add-link">+ Nouvelle destination</a>
+
+        <div class="card">
+            {% if presets is empty %}
+                <p class="empty">Aucune destination configurée pour l'instant.</p>
+            {% endif %}
+            {% for preset in presets %}
+                <div class="preset-row">
+                    <div class="preset-info">
+                        <div class="name">
+                            {{ preset.name }}
+                            {% if preset.enabled %}<span class="badge on">Actif</span>{% else %}<span class="badge off">Désactivé</span>{% endif %}
+                        </div>
+                        <div class="meta">
+                            {{ preset.address }}<br>
+                            {% if preset.daysOfWeek is not empty %}
+                                {% set jours = {1: 'Lun', 2: 'Mar', 3: 'Mer', 4: 'Jeu', 5: 'Ven', 6: 'Sam', 7: 'Dim'} %}
+                                {{ preset.daysOfWeek|map(d => jours[d])|join(', ') }} · {{ preset.startTime }}–{{ preset.endTime }}
+                            {% else %}
+                                Usage ponctuel uniquement
+                            {% endif %}
+                        </div>
+                    </div>
+                    <div class="actions">
+                        <form method="post" action="{{ path('admin_preset_activate', {id: preset.id}) }}">
+                            <select name="hours" class="hours">
+                                <option value="1">1h</option>
+                                <option value="2" selected>2h</option>
+                                <option value="4">4h</option>
+                                <option value="8">8h</option>
+                            </select>
+                            <button type="submit" class="btn-small primary">Afficher maintenant</button>
+                        </form>
+                        <a href="{{ path('admin_preset_edit', {id: preset.id}) }}" class="btn-small">Modifier</a>
+                        <form method="post" action="{{ path('admin_preset_delete', {id: preset.id}) }}" onsubmit="return confirm('Supprimer cette destination ?');">
+                            <button type="submit" class="btn-small danger">Supprimer</button>
+                        </form>
+                    </div>
+                </div>
+            {% endfor %}
+        </div>
+    </div>
+{% endblock %}

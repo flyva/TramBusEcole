@@ -90,6 +90,104 @@ body {
 
 .slide-title.mode-tram .name { color: var(--tram); }
 .slide-title.mode-bus .name { color: var(--bus); }
+.slide-title.mode-itinerary .name { color: var(--urgent); }
+.slide-title.mode-bikes .name { color: #7dd3a8; }
+
+.itinerary-left .ligne, .itinerary-nearby-item .ligne {
+    font-weight: 800;
+    padding: 0.1em 0.6em;
+    border-radius: 0.4em;
+    background: var(--urgent);
+    color: #000;
+    font-size: clamp(0.9rem, 1.8vw, 1.3rem);
+    display: inline-block;
+    margin-bottom: 0.3em;
+}
+
+.itinerary-meta {
+    margin-top: auto;
+    padding-top: 2vh;
+    display: flex;
+    gap: 1.5em;
+    font-size: clamp(1rem, 2.2vw, 1.6rem);
+    color: var(--fg);
+}
+
+.itinerary-meta small {
+    color: var(--muted);
+    font-size: 0.7em;
+}
+
+.itinerary-right {
+    display: flex;
+    flex-direction: column;
+}
+
+.itinerary-qr {
+    display: flex;
+    align-items: center;
+    gap: 1.2vw;
+    padding-bottom: 2vh;
+    border-bottom: 1px solid var(--border);
+    margin-bottom: 2vh;
+}
+
+.itinerary-qr img {
+    width: clamp(70px, 10vw, 130px);
+    height: clamp(70px, 10vw, 130px);
+    border-radius: 0.6vw;
+    background: #fff;
+    padding: 4px;
+}
+
+.itinerary-address {
+    color: var(--muted);
+    font-size: clamp(0.85rem, 1.7vw, 1.2rem);
+}
+
+.itinerary-nearby-item {
+    display: flex;
+    align-items: center;
+    gap: 0.8em;
+    padding: 1vh 0;
+    border-bottom: 1px solid var(--border);
+    font-size: clamp(0.85rem, 1.7vw, 1.2rem);
+}
+
+.itinerary-nearby-item .destination {
+    flex: 1;
+    color: var(--muted);
+}
+
+.itinerary-nearby-item .departure-wait {
+    font-weight: 800;
+    font-size: 1.3em;
+}
+
+.bikes-column {
+    background: var(--panel-bg);
+    border: 1px solid var(--border);
+    border-radius: 1.2vw;
+    padding: 2.5vh 2.5vw;
+    flex: 1;
+    display: flex;
+    flex-direction: column;
+    justify-content: center;
+    gap: 1.5vh;
+}
+
+.bike-row {
+    display: flex;
+    align-items: center;
+    gap: 1.5em;
+    padding: 1vh 0;
+    border-bottom: 1px solid var(--border);
+    font-size: clamp(1.1rem, 2.4vw, 1.8rem);
+}
+
+.bike-row:last-child { border-bottom: none; }
+.bike-name { flex: 1; color: var(--muted); }
+.bike-count { font-weight: 700; }
 
 .alert {
     display: flex;
