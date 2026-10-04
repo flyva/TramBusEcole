@@ -27,6 +27,7 @@ class TbmApiClient
         $params = [
             'dataset' => 'sv_arret_p',
             'geofilter.distance' => sprintf('%F,%F,%d', $lat, $lng, $radiusMeters),
+            'sort' => 'dist',
             'rows' => 50,
         ];
         if ($vehicule !== null) {
